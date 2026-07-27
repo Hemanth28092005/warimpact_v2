@@ -2,6 +2,8 @@
 #    uv pip compile pyproject.toml --extra dev -o requirements.lock
 alembic==1.13.2
     # via war-impact-platform (pyproject.toml)
+amqp==5.3.1
+    # via kombu
 annotated-doc==0.0.4
     # via typer
 annotated-types==0.7.0
@@ -13,14 +15,30 @@ anyio==4.14.2
     #   watchfiles
 asyncpg==0.29.0
     # via war-impact-platform (pyproject.toml)
+billiard==4.2.4
+    # via celery
+celery==5.4.0
+    # via
+    #   war-impact-platform (pyproject.toml)
+    #   flower
 certifi==2026.7.22
     # via
     #   httpcore
     #   httpx
 click==8.4.2
     # via
+    #   celery
+    #   click-didyoumean
+    #   click-plugins
+    #   click-repl
     #   rich-toolkit
     #   uvicorn
+click-didyoumean==0.3.1
+    # via celery
+click-plugins==1.1.1.2
+    # via celery
+click-repl==0.3.0
+    # via celery
 colorama==0.4.6
     # via
     #   click
@@ -37,6 +55,8 @@ fastapi==0.111.0
     # via war-impact-platform (pyproject.toml)
 fastapi-cli==0.0.32
     # via fastapi
+flower==2.0.1
+    # via war-impact-platform (pyproject.toml)
 greenlet==3.5.4
     # via sqlalchemy
 h11==0.16.0
@@ -49,6 +69,8 @@ httptools==0.8.0
     # via uvicorn
 httpx==0.28.1
     # via fastapi
+humanize==4.16.0
+    # via flower
 idna==3.18
     # via
     #   anyio
@@ -58,6 +80,8 @@ iniconfig==2.3.0
     # via pytest
 jinja2==3.1.6
     # via fastapi
+kombu==5.6.2
+    # via celery
 mako==1.3.12
     # via alembic
 markdown-it-py==4.2.0
@@ -75,9 +99,15 @@ mypy-extensions==1.1.0
 orjson==3.11.9
     # via fastapi
 packaging==26.2
-    # via pytest
+    # via
+    #   kombu
+    #   pytest
 pluggy==1.6.0
     # via pytest
+prometheus-client==0.26.0
+    # via flower
+prompt-toolkit==3.0.53
+    # via click-repl
 psycopg==3.2.1
     # via war-impact-platform (pyproject.toml)
 psycopg-binary==3.2.1
@@ -102,6 +132,8 @@ pytest-asyncio==0.23.8
     # via war-impact-platform (pyproject.toml)
 pytest-cov==5.0.0
     # via war-impact-platform (pyproject.toml)
+python-dateutil==2.9.0.post0
+    # via celery
 python-dotenv==1.0.1
     # via
     #   war-impact-platform (pyproject.toml)
@@ -109,8 +141,12 @@ python-dotenv==1.0.1
     #   uvicorn
 python-multipart==0.0.32
     # via fastapi
+pytz==2026.3.post1
+    # via flower
 pyyaml==6.0.3
     # via uvicorn
+redis==5.0.8
+    # via war-impact-platform (pyproject.toml)
 rich==15.0.0
     # via
     #   rich-toolkit
@@ -121,12 +157,16 @@ ruff==0.5.7
     # via war-impact-platform (pyproject.toml)
 shellingham==1.5.4
     # via typer
+six==1.17.0
+    # via python-dateutil
 sqlalchemy==2.0.32
     # via
     #   war-impact-platform (pyproject.toml)
     #   alembic
 starlette==0.37.2
     # via fastapi
+tornado==6.5.7
+    # via flower
 typer==0.27.0
     # via fastapi-cli
 typing-extensions==4.16.0
@@ -141,7 +181,10 @@ typing-extensions==4.16.0
     #   rich-toolkit
     #   sqlalchemy
 tzdata==2026.3
-    # via psycopg
+    # via
+    #   celery
+    #   kombu
+    #   psycopg
 ujson==5.13.0
     # via fastapi
 uvicorn==0.30.5
@@ -149,7 +192,14 @@ uvicorn==0.30.5
     #   war-impact-platform (pyproject.toml)
     #   fastapi
     #   fastapi-cli
+vine==5.1.0
+    # via
+    #   amqp
+    #   celery
+    #   kombu
 watchfiles==1.2.0
     # via uvicorn
+wcwidth==0.8.2
+    # via prompt-toolkit
 websockets==16.1.1
     # via uvicorn

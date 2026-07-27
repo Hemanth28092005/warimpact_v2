@@ -2,7 +2,7 @@
 
 ## Project Description
 
-This platform will collect conflict, instability, trade, commodity, and logistics signals to help analysts reason about geopolitical disruption and trade exposure. It will be built as a modular FastAPI backend, PostgreSQL data store, reproducible ingestion and modeling pipelines, and a React/Deck.gl geospatial frontend.
+This platform will collect conflict, instability, trade, commodity, and logistics signals to help analysts reason about geopolitical disruption and trade exposure. It will be built as a modular FastAPI backend, PostgreSQL data store, Celery and Redis automation layer, reproducible ingestion and modeling pipelines, and a React/Deck.gl geospatial frontend.
 
 The project emphasizes data honesty, explicit scope, and phase-by-phase verification. Quantitative outputs will distinguish authoritative observations from proxies, estimates, or synthetic development data.
 
@@ -10,11 +10,11 @@ The project emphasizes data honesty, explicit scope, and phase-by-phase verifica
 
 ### Phase 0: Repository Setup
 
-Phase 0 establishes the repository structure, tooling contracts, documentation baseline, local Postgres configuration, Alembic migration path, and frontend scaffold. It contains no application logic and exists to prove that the development environment can run migrations, tests, Docker, and the Vite application shell.
+Phase 0 establishes the repository structure, tooling contracts, documentation baseline, local Postgres and Redis configuration, Alembic migration path, Celery app scaffold, and frontend scaffold. It contains no application logic and exists to prove that the development environment can run migrations, tests, Docker services, the Celery worker shell, and the Vite application shell.
 
 ### Phase 1: GDELT Event Ingestion Foundation
 
-Phase 1 will implement the first conflict/event ingestion pipeline using GDELT 2.0 event data. The work will be split into fetch, parse, clean, dispatch, and worker modules with structured logging, retries, source health tracking, and tests around parsing and cleaning.
+Phase 1 will implement the first conflict/event ingestion pipeline using GDELT 2.0 event data. The work will be split into fetch, parse, clean, dispatch, worker, and Celery task modules with structured logging, retries, source health tracking, and tests around parsing and cleaning.
 
 ### Phase 2: GDELT Text and Sentiment Pipeline
 
@@ -30,7 +30,7 @@ Phase 4 will expose versioned FastAPI endpoints for countries, event summaries, 
 
 ### Phase 5: Trade Data Ingestion
 
-Phase 5 will add UN Comtrade, WITS, and World Bank trade data ingestion for the scoped countries and commodities. The pipeline will preserve source metadata, update cadence, and quality flags so derived trade exposure can be audited.
+Phase 5 will add UN Comtrade, WITS, and World Bank trade data ingestion for the scoped countries and commodities. The pipeline will preserve source metadata, update cadence, Celery task traceability, and quality flags so derived trade exposure can be audited.
 
 ### Phase 6: Trade Exposure Modeling
 
@@ -58,7 +58,7 @@ Phase 11 will prototype XGBoost or LightGBM commodity signal models where data s
 
 ### Phase 12: Operational Hardening
 
-Phase 12 will strengthen observability, retry behavior, API security, CI quality gates, and deployment readiness. This phase will also review file sizes, module boundaries, coverage thresholds, and source health reporting across pipelines.
+Phase 12 will strengthen observability, retry behavior, API security, queue monitoring, Celery Beat scheduling, CI quality gates, and deployment readiness. This phase will also review file sizes, module boundaries, coverage thresholds, and source health reporting across pipelines.
 
 ### Phase 13: Deployment and Release Readiness
 
