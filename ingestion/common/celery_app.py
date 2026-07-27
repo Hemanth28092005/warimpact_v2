@@ -2,23 +2,18 @@
 
 from __future__ import annotations
 
-import os
-
 from celery import Celery  # type: ignore[import-untyped]
-from dotenv import load_dotenv
 
 from ingestion.common.beat_schedule import BEAT_SCHEDULE
+from ingestion.common.config import get_settings
 
-load_dotenv()
-
-DEFAULT_BROKER_URL = "redis://localhost:6379/0"
-DEFAULT_RESULT_BACKEND = "redis://localhost:6379/1"
+settings = get_settings()
 
 celery_app = Celery(
     "war_impact_platform",
-    broker=os.getenv("CELERY_BROKER_URL", DEFAULT_BROKER_URL),
-    backend=os.getenv("CELERY_RESULT_BACKEND", DEFAULT_RESULT_BACKEND),
-    include=[],
+    broker=settings.celery_broker_url,
+    backend=settings.celery_result_backend,
+    include=["ingestion.gdelt.tasks"],
 )
 
 celery_app.conf.update(

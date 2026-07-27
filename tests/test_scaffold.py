@@ -19,4 +19,4 @@ def test_celery_app_uses_env_configured_redis_defaults() -> None:
 
     assert celery_app.conf.broker_url == "redis://localhost:6379/0"
     assert celery_app.conf.result_backend == "redis://localhost:6379/1"
-    assert celery_app.conf.beat_schedule == {}
+    assert "gdelt-run-latest-ingestion" in celery_app.conf.beat_schedule

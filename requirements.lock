@@ -112,6 +112,8 @@ psycopg==3.2.1
     # via war-impact-platform (pyproject.toml)
 psycopg-binary==3.2.1
     # via psycopg
+pycountry==24.6.1
+    # via war-impact-platform (pyproject.toml)
 pydantic==2.8.2
     # via
     #   war-impact-platform (pyproject.toml)

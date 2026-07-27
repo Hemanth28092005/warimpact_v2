@@ -1,0 +1,1 @@
+"""GDELT ingestion tests."""
