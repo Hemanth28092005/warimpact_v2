@@ -1,0 +1,51 @@
+[project]
+name = "war-impact-platform"
+version = "0.1.0"
+description = "Global Geopolitical Instability and Trade Impact Platform"
+requires-python = ">=3.11"
+dependencies = [
+  "alembic==1.13.2",
+  "asyncpg==0.29.0",
+  "fastapi==0.111.0",
+  "psycopg[binary]==3.2.1",
+  "pydantic==2.8.2",
+  "pydantic-settings==2.4.0",
+  "python-dotenv==1.0.1",
+  "sqlalchemy==2.0.32",
+  "uvicorn[standard]==0.30.5"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==8.3.2",
+  "pytest-asyncio==0.23.8",
+  "pytest-cov==5.0.0",
+  "ruff==0.5.7",
+  "mypy==1.11.1"
+]
+ml = [
+  "huggingface-hub==0.24.5",
+  "lightgbm==4.5.0",
+  "networkx==3.3",
+  "transformers==4.44.0",
+  "xgboost==2.1.1"
+]
+
+[build-system]
+requires = ["setuptools==72.2.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
