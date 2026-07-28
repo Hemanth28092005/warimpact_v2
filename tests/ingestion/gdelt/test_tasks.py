@@ -5,8 +5,10 @@ from pytest import MonkeyPatch
 
 def test_beat_schedule_registers_latest_ingestion() -> None:
     schedule = BEAT_SCHEDULE["gdelt-run-latest-ingestion"]
+    sentiment_schedule = BEAT_SCHEDULE["models-run-daily-sentiment-pipeline"]
 
     assert schedule["task"] == "ingestion.gdelt.tasks.run_latest_ingestion"
+    assert sentiment_schedule["task"] == "models.sentiment.tasks.run_daily_sentiment_pipeline"
 
 
 def test_latest_task_delegates_to_worker(monkeypatch: MonkeyPatch) -> None:

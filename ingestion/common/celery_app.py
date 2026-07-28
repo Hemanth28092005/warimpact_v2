@@ -13,7 +13,7 @@ celery_app = Celery(
     "war_impact_platform",
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
-    include=["ingestion.gdelt.tasks"],
+    include=["ingestion.gdelt.tasks", "models.sentiment.tasks"],
 )
 
 celery_app.conf.update(

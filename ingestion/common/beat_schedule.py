@@ -17,5 +17,9 @@ BEAT_SCHEDULE: dict[str, dict[str, Any]] = {
     "gdelt-run-latest-ingestion": {
         "task": "ingestion.gdelt.tasks.run_latest_ingestion",
         "schedule": timedelta(minutes=settings.gdelt_latest_interval_minutes),
-    }
+    },
+    "models-run-daily-sentiment-pipeline": {
+        "task": "models.sentiment.tasks.run_daily_sentiment_pipeline",
+        "schedule": timedelta(hours=24),
+    },
 }
