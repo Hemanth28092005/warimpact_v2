@@ -55,9 +55,16 @@ async def run_ingestion(
             records_processed = 0
             records_failed = 0
             for feed_file in feed_files:
-                processed, failed = await _process_feed_file(conn, feed_file, run_id, celery_task_id)
-                records_processed += processed
-                records_failed += failed
+                try:
+                    processed, failed = await _process_feed_file(conn, feed_file, run_id, celery_task_id)
+                    records_processed += processed
+                    records_failed += failed
+                except Exception as exc:
+                    records_failed += 1
+                    logger.warning(
+                        "gdelt_feed_file_skipped",
+                        extra={"url": feed_file.url, "error": str(exc)},
+                    )
 
             await record_source_health(
                 conn,

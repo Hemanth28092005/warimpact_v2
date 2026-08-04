@@ -1,0 +1,43 @@
+{
+  "model_version": "cii-v20260728_simulated",
+  "trained_at": "2026-07-31T04:50:52.097542+00:00",
+  "in_scope_countries_count": 38,
+  "train_samples_count": 11126,
+  "val_samples_count": 2782,
+  "train_date_range": [
+    "2025-07-28",
+    "2026-05-16"
+  ],
+  "val_date_range": [
+    "2026-05-16",
+    "2026-07-28"
+  ],
+  "regressor": {
+    "model_type": "LightGBM Regressor",
+    "val_rmse": 14.379,
+    "val_mae": 11.3993,
+    "val_r2": 0.6807,
+    "baseline_rmse": 25.4451,
+    "beats_baseline": true
+  },
+  "classifier": {
+    "model_type": "XGBoost Classifier",
+    "val_roc_auc": 0.6338,
+    "baseline_roc_auc": 0.5,
+    "beats_baseline": true
+  },
+  "confidence_interval_method": "empirical_residual_std_error_95pct",
+  "feature_importances": {
+    "conflict_intensity_7d_avg": 0.0237,
+    "conflict_intensity_30d_avg": 0.0876,
+    "sentiment_7d_avg": 0.0905,
+    "sentiment_30d_avg": 0.2096,
+    "intensity_7d_delta": 0.0014,
+    "intensity_30d_std": 0.1163,
+    "volume_trend_7d_30d_ratio": 0.0237,
+    "event_count_7d_avg": 0.1005,
+    "event_count_30d_avg": 0.1414,
+    "material_conflict_30d_sum": 0.2053
+  },
+  "label_proxy_caveats": "Annual FSI total scores linearly interpolated to daily frequency as a long-term stability proxy target, not daily ground truth. Historical training signals use composite formula (0.4*tone_norm + 0.4*goldstein_norm + 0.2*quad_signed) with confidence=0.65 (no article scraping performed for backfill dates), whereas live production scoring uses real RoBERTa text + AvgTone fallback."
+}

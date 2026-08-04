@@ -33,7 +33,7 @@ def test_country_daily_signal_creation() -> None:
 async def test_compute_normalized_intensity_min_max_scaling() -> None:
     mock_conn = MagicMock()
     mock_cursor = AsyncMock()
-    mock_cursor.fetchall.return_value = [(10.0,), (50.0,)]
+    mock_cursor.fetchall.return_value = [("USA", 10.0, 50.0)]
     mock_conn.cursor.return_value.__aenter__ = AsyncMock(return_value=mock_cursor)
 
     norm = await _compute_normalized_intensity(mock_conn, "USA", date(2026, 7, 27), 100.0)

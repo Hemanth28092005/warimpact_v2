@@ -75,11 +75,23 @@ def _required_int(value: str, field_name: str) -> int:
 
 
 def _optional_int(value: str) -> int | None:
-    return int(value) if value.strip() else None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    try:
+        return int(cleaned)
+    except (ValueError, TypeError):
+        raise ValueError(f"invalid int value: {value}")
 
 
 def _optional_decimal(value: str) -> Decimal | None:
-    return Decimal(value) if value.strip() else None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    try:
+        return Decimal(cleaned)
+    except Exception:
+        raise ValueError(f"invalid decimal value: {value}")
 
 
 def _parse_sql_date(value: str) -> date:

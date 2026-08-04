@@ -67,28 +67,36 @@ async def compute_and_save_country_signals(
         logger.info("no_country_events_found_for_date", extra={"target_date": str(target_date)})
         return []
 
-    # Map sentiment results by global_event_id and lookup country for sentiment grouping
-    # Build lookup of event -> country & sentiment
-    event_country_map: dict[int, str] = {}
-    async with conn.cursor() as cur:
-        await cur.execute(
-            """
-            SELECT global_event_id,
-                   COALESCE(action_geo_country_code, actor1_country_code, actor2_country_code) AS country_code
-            FROM gdelt_events
-            WHERE event_date = %s
-            """,
-            (target_date,),
-        )
-        for r in await cur.fetchall():
-            if r[1]:
-                event_country_map[r[0]] = r[1]
-
     sentiment_by_country: dict[str, list[EventSentimentResult]] = {}
+    missing_country_res: list[EventSentimentResult] = []
     for res in sentiment_results:
-        country = event_country_map.get(res.global_event_id)
-        if country:
-            sentiment_by_country.setdefault(country, []).append(res)
+        if res.country_code:
+            sentiment_by_country.setdefault(res.country_code, []).append(res)
+        else:
+            missing_country_res.append(res)
+
+    if missing_country_res:
+        event_country_map: dict[int, str] = {}
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                SELECT global_event_id,
+                       COALESCE(action_geo_country_code, actor1_country_code, actor2_country_code) AS country_code
+                FROM gdelt_events
+                WHERE event_date = %s
+                """,
+                (target_date,),
+            )
+            for r in await cur.fetchall():
+                if r[1]:
+                    event_country_map[r[0]] = r[1]
+        for res in missing_country_res:
+            country = event_country_map.get(res.global_event_id)
+            if country:
+                sentiment_by_country.setdefault(country, []).append(res)
+
+    # 2. Fetch 90-day rolling historical min/max values for all countries in 1 query
+    historical_extrema = await _get_historical_intensity_extrema(conn, target_date)
 
     computed_at = datetime.now(timezone.utc)
     signals: list[CountryDailySignal] = []
@@ -103,10 +111,14 @@ async def compute_and_save_country_signals(
         avg_goldstein = float(r[4]) if r[4] is not None else None
         weighted_intensity = float(r[5])
 
-        # 2. Compute 90-day rolling min-max normalization
-        normalized_intensity = await _compute_normalized_intensity(
-            conn, country, target_date, weighted_intensity
-        )
+        # Compute 90-day rolling min-max normalization
+        hist_min, hist_max = historical_extrema.get(country, (weighted_intensity, weighted_intensity))
+        min_val = min(hist_min, weighted_intensity)
+        max_val = max(hist_max, weighted_intensity)
+        if max_val > min_val:
+            normalized_intensity = (weighted_intensity - min_val) / (max_val - min_val)
+        else:
+            normalized_intensity = 0.0
 
         # 3. Compute country sentiment summary
         c_sentiments = sentiment_by_country.get(country, [])
@@ -169,6 +181,26 @@ async def compute_and_save_country_signals(
     return signals
 
 
+async def _get_historical_intensity_extrema(
+    conn: AsyncConnection,
+    target_date: date,
+) -> dict[str, tuple[float, float]]:
+    """Compute rolling 90-day min/max weighted_conflict_intensity for all countries in 1 query."""
+    start_date = target_date - timedelta(days=90)
+    async with conn.cursor() as cur:
+        await cur.execute(
+            """
+            SELECT country_code, MIN(weighted_conflict_intensity), MAX(weighted_conflict_intensity)
+            FROM country_daily_signals
+            WHERE signal_date BETWEEN %s AND %s
+            GROUP BY country_code
+            """,
+            (start_date, target_date),
+        )
+        rows = await cur.fetchall()
+        return {r[0]: (float(r[1]), float(r[2])) for r in rows if r[1] is not None and r[2] is not None}
+
+
 async def _compute_normalized_intensity(
     conn: AsyncConnection,
     country_code: str,
@@ -176,22 +208,10 @@ async def _compute_normalized_intensity(
     current_weighted_intensity: float,
 ) -> float:
     """Compute rolling 90-day min-max scaling of weighted_conflict_intensity in [0.0, 1.0]."""
-    start_date = target_date - timedelta(days=90)
-    async with conn.cursor() as cur:
-        await cur.execute(
-            """
-            SELECT weighted_conflict_intensity
-            FROM country_daily_signals
-            WHERE country_code = %s AND signal_date BETWEEN %s AND %s
-            """,
-            (country_code, start_date, target_date),
-        )
-        historical_values = [float(r[0]) for r in await cur.fetchall()]
-
-    all_values = historical_values + [current_weighted_intensity]
-    min_val = min(all_values)
-    max_val = max(all_values)
-
+    extrema = await _get_historical_intensity_extrema(conn, target_date)
+    hist_min, hist_max = extrema.get(country_code, (current_weighted_intensity, current_weighted_intensity))
+    min_val = min(hist_min, current_weighted_intensity)
+    max_val = max(hist_max, current_weighted_intensity)
     if max_val > min_val:
         return (current_weighted_intensity - min_val) / (max_val - min_val)
     return 0.0

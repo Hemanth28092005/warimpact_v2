@@ -46,24 +46,84 @@ class EventSentimentResult:
     global_event_id: int
     source_url: str
     sentiment_score: float  # Bounded in [-1.0, 1.0]
-    confidence: float  # 1.0 if RoBERTa article score, 0.5 if AvgTone fallback
+    confidence: float  # 1.0 if RoBERTa article score, 0.65 if composite, 0.5 if AvgTone fallback
     used_article_text: bool
+    country_code: str = ""
+
+
+QUAD_CLASS_SIGNED: dict[int, float] = {
+    1: 0.5,   # Verbal Cooperation
+    2: 1.0,   # Material Cooperation
+    3: -0.5,  # Verbal Conflict
+    4: -1.0,  # Material Conflict
+}
+
+
+def compute_composite_historical_sentiment(
+    avg_tone: float | None,
+    goldstein_scale: float | None,
+    quad_class: int | None,
+) -> float:
+    """Compute composite historical sentiment score bounded in [-1.0, 1.0] for backfill dates.
+
+    Formula:
+        composite_score = 0.4 * tone_norm + 0.4 * goldstein_norm + 0.2 * quad_class_signed
+    """
+    tone_val = float(avg_tone) if avg_tone is not None else 0.0
+    tone_norm = max(-1.0, min(1.0, tone_val / 10.0))
+
+    goldstein_val = float(goldstein_scale) if goldstein_scale is not None else 0.0
+    goldstein_norm = max(-1.0, min(1.0, goldstein_val / 10.0))
+
+    quad_val = quad_class if quad_class is not None else 0
+    quad_signed = QUAD_CLASS_SIGNED.get(quad_val, 0.0)
+
+    score = (0.4 * tone_norm) + (0.4 * goldstein_norm) + (0.2 * quad_signed)
+    return max(-1.0, min(1.0, round(score, 4)))
 
 
 def score_events_sentiment(
     events: Sequence[Any],
-    cached_articles: dict[str, Any],
+    cached_articles: dict[str, Any] | None = None,
     batch_size: int = DEFAULT_BATCH_SIZE,
+    is_historical_backfill: bool = False,
 ) -> list[EventSentimentResult]:
-    """Calculate sentiment score in [-1.0, 1.0] for each sampled event using RoBERTa or AvgTone fallback."""
-    pipe = _get_sentiment_pipeline()
+    """Calculate sentiment score in [-1.0, 1.0] for each sampled event.
+
+    - If is_historical_backfill=True: uses composite historical formula with confidence=0.65.
+    - If is_historical_backfill=False: uses real RoBERTa article scoring (confidence=1.0) or AvgTone fallback (confidence=0.5).
+    """
+    if cached_articles is None:
+        cached_articles = {}
+
     results: list[EventSentimentResult] = []
+
+    # Historical backfill branch: fast composite scoring (no article fetching required)
+    if is_historical_backfill:
+        for event in events:
+            avg_tone = getattr(event, "avg_tone", None)
+            goldstein_scale = getattr(event, "goldstein_scale", None)
+            quad_class = getattr(event, "quad_class", None)
+            country = getattr(event, "country_code", "")
+            score = compute_composite_historical_sentiment(avg_tone, goldstein_scale, quad_class)
+            results.append(
+                EventSentimentResult(
+                    global_event_id=event.global_event_id,
+                    source_url=event.source_url,
+                    sentiment_score=score,
+                    confidence=0.65,  # Distinct tier for composite historical fallback
+                    used_article_text=False,
+                    country_code=country,
+                )
+            )
+        return results
 
     # Separate events into article text scoring vs AvgTone fallback
     text_events: list[tuple[int, int, str, str]] = []  # (index, event_id, url, text)
 
     for idx, event in enumerate(events):
         url = event.source_url
+        country = getattr(event, "country_code", "")
         article = cached_articles.get(url)
         if article and article.fetch_status == "success" and article.article_text:
             text_events.append((idx, event.global_event_id, url, article.article_text))
@@ -77,6 +137,7 @@ def score_events_sentiment(
                     sentiment_score=score,
                     confidence=0.5,
                     used_article_text=False,
+                    country_code=country,
                 )
             )
 

@@ -71,3 +71,77 @@ No data has been ingested in Phase 0.
 ## Scope Decisions
 
 No countries, commodities, ports, routes, or data sources have been selected beyond the project-level technology choices in Phase 0.
+
+## Country Bilateral Aggression Score Component
+
+### Architecture & Framing ("What this is / What this is not")
+- **What this is**: A quantitative, bounded $[0.0, 100.0]$ metric measuring bilateral conflict severity and strategic relationship stance between 38 target countries ($C(38,2) = 703$ canonical pairs).
+  - **GDELT-derived Scores** (`data_source = 'gdelt_derived'`): Computed over a **trailing 365-day rolling window** (`event_date >= target_date - 365 days`) using GDELT 2.0 event severity ($0.4 \cdot tone\_norm + 0.4 \cdot goldstein\_norm + 0.2 \cdot quad\_class\_signed$) and log-scaled volume importance weights.
+  - **External Baseline Scores** (`data_source = 'external_baseline'`): Seeded from Correlates of War (COW) published datasets (Formal Alliances v4.1 through 2012, MID v4.2 through 2010) for pairs with 0 GDELT events in the trailing 365-day window.
+- **What this is NOT**:
+  - The external baseline is **not a real-time diplomatic intelligence feed**. It reflects static historical alliance and dispute status as of dataset publication (`baseline_data_year` = 2012 for Alliances, 2010 for MIDs) until superseded by real GDELT events (`event_count > 0`).
+  - Unrecorded pairs lacking both GDELT events and COW records are stored with `aggression_score = NULL` and logged as explicitly unscored. Zero fabricated, guessed, or default middle values are ever inserted.
+
+## Phase 4: Cascade / Cross-Stream Correlation System
+
+### Architecture & Graph Construction
+- **Country Adjacency Graph**: Built on the 38 in-scope countries incorporating two edge types:
+  1. **Physical Borders**: Sourced from the **REST Countries API v3.1** (`https://restcountries.com/v3.1/all`) land border dataset.
+  2. **Bilateral Event Linkage**: Sourced from `country_aggression_scores.event_count` (trailing 365-day window), adding edges for the top 5 highest event volume pairs per country.
+- **Spike Detection**: For each country, identifies spike dates where $\text{cii\_score} > \text{rolling\_mean\_30d} + K \cdot \text{rolling\_std\_30d}$ ($K = 2.0$ default, configurable). Queries are strictly scoped to a single `model_version` to prevent statistical corruption.
+- **BFS Contagion Score**: When source country $A$ spikes on day $D$, counts co-spikes in adjacent country $B$ within $[D, D + N]$ days ($N = 7$ default, configurable). $\text{contagion\_score} = \frac{\text{co\_spike\_count}}{\text{source\_spike\_count}}$.
+
+### System Limitations & Analytical Disclaimers (Non-Negotiable)
+1. **Correlation $\neq$ Causation**:
+   Shared external macro shocks (e.g., a regional or global crisis affecting multiple countries simultaneously) can produce co-occurring CII spikes without direct contagion between the countries.
+2. **Statistical Association Measure**:
+   `contagion_score` measures empirical temporal co-occurrence of statistical outliers within an $N$-day window. It is NOT a structural, physical, or causal dynamic model.
+3. **Signal Confounding & Spurious Correlations**:
+   CII is derived from GDELT conflict and sentiment signals. Without cross-referencing secondary streams (e.g., Phase 5 trade exposure, bilateral capital flows, logistics chokepoints), spurious correlations cannot be ruled out.
+4. **Fixed-Sigma Spike Threshold Bias**:
+   Because spike detection uses an absolute $K \cdot \text{std}$ threshold, it is miscalibrated across countries with different baseline volatility. Stable countries with naturally low CII variance (e.g. ESP, $\text{std} \approx 3.65$) register "spikes" from routine noise ($+3\text{--}10$ point moves) far more often than chronically volatile countries (e.g. YEM, std much higher, operating near the 100.00 score ceiling), where even severe real escalations often fail to exceed a 2-sigma threshold. Empirically: ESP registered 46 spike days vs. YEM's 11, despite YEM undergoing well-documented severe escalation during this period. Consequently, cascade contagion scores for conflict-cluster country pairs (e.g. SYR-YEM, SDN-SSD, ISR-SYR: 0.00--0.25) are systematically LOWER than for stable-country pairs (e.g. DEU-ITA, USA-CAN: 0.48--0.73) — this should NOT be read as evidence that contagion is weaker among conflict-prone countries; it is a detector calibration artifact.
+
+## Phase 5: Lightweight Trade Exposure Layer
+
+### Data Source & Schema
+- **Data Source**: Published **UN Comtrade Database 2023** (`https://comtradeplus.un.org`), dataset `UN_COMTRADE_2023`.
+- **Publication Lag**: 2023 edition (lagging ~1--2 years relative to present).
+- **Scope & Quality**: Ingests total annual bilateral trade (exports + imports) for all 38 reporter countries across **all global trading partners**. Preserves `is_estimated = True` where source figures include UN Comtrade estimates for partially reporting territories.
+
+### Derived Features & Empirical Ablation (`models/cii/features.py`)
+1. `trade_concentration` (**ACTIVE IN MODEL**): Herfindahl-Hirschman Index (HHI) computed over the global trading partner set for each reporter country:
+   $$\text{HHI} = \sum_{p \in \text{All Partners}} \left( \frac{\text{trade\_value}_p}{\text{total\_global\_trade}} \times 100 \right)^2 \implies \text{trade\_concentration} = \frac{\text{HHI}}{10000.0}$$
+2. `conflict_partner_exposure` (**EXCLUDED FROM ACTIVE FEATURE SET**): Trade-weighted sum of in-scope partners' CII scores on the target date:
+   $$\text{conflict\_partner\_exposure} = \sum_{p \in \text{In-Scope}} \left( \frac{\text{trade\_value}_p}{\sum_{j \in \text{In-Scope}} \text{trade\_value}_j} \right) \times \text{cii\_score}_p$$
+
+> [!NOTE]
+> **Empirical Ablation Finding & Exclude Decision**:
+> `conflict_partner_exposure` was fully implemented, fixed for driver type compatibility (`Decimal` parsing), and tested across historical training samples. In isolation, it exhibited strong positive linear correlation with the target FSI label ($r = +0.3449$). However, ablation testing revealed that combining `conflict_partner_exposure` with `trade_concentration` was **net-negative for model generalization** ($R^2 = 0.8195$ with both features vs. $R^2 = \mathbf{0.8303}$ with `trade_concentration` alone). Because partner conflict signal is largely redundant with direct country-level conflict and sentiment features, `conflict_partner_exposure` was excluded from active `FEATURE_COLUMNS` to prevent multicollinearity and over-parameterization while keeping its code path intact for diagnostic research.
+
+### Retraining & Guardrail Promotion Results
+- **Active Baseline Model** (`cii-v20260730_promoted_live`): 9 baseline features, $R^2 = 0.6726$, $\text{RMSE} = 14.5597$, $\text{AUC} = 0.6300$.
+- **Retrained Promoted Model** (`cii-v20260730`): 10 features (`trade_concentration` active), $R^2 = \mathbf{0.8574}$, $\text{RMSE} = \mathbf{9.6075}$, $\text{AUC} = \mathbf{0.6318}$.
+- **Guardrail Outcome**: **PROMOTED** to active live model. Retaining `trade_concentration` alone improved validation $R^2$ to $0.8574$ ($+0.1848$ gain) and reduced RMSE to $9.6075$ (a 34.0% err## Phase 5: Machine Learning Core & Model Metrics Framing
+
+### Model Performance & Versioning
+- **Trade Concentration Feature Model (`cii-v20260730`)**: Evaluates trade vulnerability (HHI) and GDELT conflict signals against 366-day FSI benchmarks across 38 nations.
+  - **Validation $R^2$**: **85.74%** ($0.8574$, beating baseline $0.8549$).
+  - **Validation RMSE**: **9.6075** (34.0% error reduction vs naive baseline).
+  - **Classifier ROC-AUC**: **0.6318** (Spike escalation prediction).
+- **CII Overall Regressor**: Measures country instability signals; overall baseline regressor $R^2 = 0.68$ across raw historical FSI benchmarks.
+- **Empirical Feature Selection Finding**: `conflict_partner_exposure` was tested and found to correlate with FSI in isolation ($R^2 = 0.8195$). However, when combined with `trade_concentration`, validation $R^2$ dropped from $0.8303$ to $0.8195$ due to signal redundancy with existing 30-day GDELT conflict and sentiment intensity features. The feature remains present in `models/cii/features.py` for research evaluation but is excluded from active model promotion (`cii-v20260730`).
+
+## Phase 6a: Dashboard Data Layer & Schema Contracts
+
+### Schema & Foreign Key Decisions
+- **`shipping_rates.route_id` Foreign Key**: `shipping_rates` references `india_trade_routes.id` (`BIGINT REFERENCES india_trade_routes(id) ON DELETE CASCADE`). This surrogate key design guarantees database-level foreign key integrity, fast indexed integer joins, and automatic cascade cleanup if a trade route is modified or removed.
+- **Full-Globe Boundary Coverage (`world_boundaries`)**: Stores GeoJSON boundaries for **253 total global countries** from Natural Earth to render a visually complete globe in the frontend, with 38 carrying live CII/risk telemetry.
+- **7 Spec-Compliant Headline Regions (`regional_headlines`)**: 7 standalone region keys (`united_states`, `india`, `africa`, `asia_pacific`, `middle_east`, `europe`, `latin_america_australia`), ensuring India and the United States each maintain dedicated top-10 headline panels (**70 rows** total).
+- **Chokepoint-Null Risk Scoring (`india_trade_routes`)**: When a trade route has `primary_chokepoint IS NULL`, the disruption weight ($0.25$) is explicitly redistributed across CII ($40\%$) and Aggression ($35\%$):
+  $$\text{risk\_score} = \frac{0.40}{0.75} \times \text{CII} + \frac{0.35}{0.75} \times \text{Aggression} \approx 0.5333 \times \text{CII} + 0.4667 \times \text{Aggression}$$
+
+
+
+
+
+

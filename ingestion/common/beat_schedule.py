@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from typing import Any
+from celery.schedules import crontab  # type: ignore[import-untyped]
 
 from ingestion.common.config import get_settings
 
@@ -20,6 +21,50 @@ BEAT_SCHEDULE: dict[str, dict[str, Any]] = {
     },
     "models-run-daily-sentiment-pipeline": {
         "task": "models.sentiment.tasks.run_daily_sentiment_pipeline",
+        "schedule": timedelta(hours=24),
+    },
+    "models-run-daily-cii-pipeline": {
+        "task": "models.cii.tasks.run_daily_cii_pipeline",
+        "schedule": timedelta(hours=24),
+    },
+    "models-run-daily-aggression-pipeline": {
+        "task": "models.aggression.tasks.run_daily_aggression_pipeline",
+        "schedule": timedelta(hours=24),
+    },
+    "models-retrain-cii-monthly": {
+        "task": "models.cii.tasks.retrain_cii_monthly",
+        "schedule": crontab(day_of_month="1", hour="3", minute="0"),
+    },
+    "models-fetch-escalation-articles": {
+        "task": "models.sentiment.tasks.fetch_escalation_articles",
+        "schedule": timedelta(minutes=settings.gdelt_latest_interval_minutes),
+    },
+    "models-run-daily-cascade-pipeline": {
+        "task": "models.cascade.tasks.run_cascade_analysis",
+        "schedule": crontab(hour="2", minute="30"),
+    },
+    "ingestion-run-regional-headlines": {
+        "task": "ingestion.dashboard.tasks.run_regional_headlines",
+        "schedule": timedelta(minutes=15),
+    },
+    "ingestion-run-government-actions": {
+        "task": "ingestion.dashboard.tasks.run_government_actions",
+        "schedule": timedelta(minutes=15),
+    },
+    "ingestion-run-protests": {
+        "task": "ingestion.dashboard.tasks.run_protests",
+        "schedule": timedelta(minutes=10),
+    },
+    "models-run-chokepoint-disruption": {
+        "task": "models.chokepoints.tasks.run_chokepoint_disruption_pipeline",
+        "schedule": timedelta(minutes=15),
+    },
+    "models-run-commodity-news": {
+        "task": "models.commodities.tasks.run_commodity_news_pipeline",
+        "schedule": timedelta(minutes=15),
+    },
+    "models-run-trade-routes-pipeline": {
+        "task": "models.trade_routes.tasks.run_trade_routes_pipeline",
         "schedule": timedelta(hours=24),
     },
 }

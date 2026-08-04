@@ -60,3 +60,33 @@ def test_score_events_sentiment_falls_back_to_avgtone_on_dead_url() -> None:
     assert res.used_article_text is False
     assert res.confidence == 0.5
     assert res.sentiment_score == -0.6
+
+
+def test_compute_composite_historical_sentiment() -> None:
+    from models.sentiment.scorer import compute_composite_historical_sentiment
+
+    # Maximum Material Cooperation (quad_class=2, tone=10, goldstein=10)
+    # 0.4*1.0 + 0.4*1.0 + 0.2*1.0 = 1.0
+    assert compute_composite_historical_sentiment(avg_tone=10.0, goldstein_scale=10.0, quad_class=2) == 1.0
+
+    # Maximum Material Conflict (quad_class=4, tone=-10, goldstein=-10)
+    # 0.4*(-1) + 0.4*(-1) + 0.2*(-1) = -1.0
+    assert compute_composite_historical_sentiment(avg_tone=-10.0, goldstein_scale=-10.0, quad_class=4) == -1.0
+
+    # Historical backfill branch in score_events_sentiment
+    event = SampledEvent(
+        global_event_id=202,
+        event_date="2025-08-01",
+        country_code="USA",
+        quad_class=4,
+        goldstein_scale=-10.0,
+        avg_tone=-10.0,
+        num_mentions=10,
+        source_url="https://example.com/historical",
+    )
+    hist_results = score_events_sentiment([event], is_historical_backfill=True)
+    assert len(hist_results) == 1
+    assert hist_results[0].sentiment_score == -1.0
+    assert hist_results[0].confidence == 0.65
+    assert hist_results[0].used_article_text is False
+

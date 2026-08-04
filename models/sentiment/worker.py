@@ -28,22 +28,28 @@ class SentimentRunSummary:
 
 async def run_sentiment_pipeline(
     target_date: date | None = None,
+    is_historical_backfill: bool = False,
 ) -> SentimentRunSummary:
     if target_date is None:
         target_date = datetime.now(timezone.utc).date()
 
-    logger.info("sentiment_pipeline_started", extra={"target_date": str(target_date)})
+    logger.info("sentiment_pipeline_started", extra={"target_date": str(target_date), "is_historical_backfill": is_historical_backfill})
 
     async with open_async_connection() as conn:
         # Step 1: Sample ~10% of events per country
         sampled_events = await sample_events_for_fetching(conn, target_date)
         unique_urls = list({e.source_url for e in sampled_events})
 
-        # Step 2: Check cache and fetch uncached article text
-        cached_articles = await fetch_and_cache_articles(conn, unique_urls)
-
-        # Step 3: Score sentiment (RoBERTa with AvgTone fallback)
-        sentiment_results = score_events_sentiment(sampled_events, cached_articles)
+        if is_historical_backfill:
+            # Step 2: Skip HTTP article fetching for historical backfill
+            cached_articles = {}
+            # Step 3: Score sentiment using composite historical formula
+            sentiment_results = score_events_sentiment(sampled_events, cached_articles=None, is_historical_backfill=True)
+        else:
+            # Step 2: Check cache and fetch uncached article text
+            cached_articles = await fetch_and_cache_articles(conn, unique_urls)
+            # Step 3: Score sentiment (RoBERTa with AvgTone fallback)
+            sentiment_results = score_events_sentiment(sampled_events, cached_articles=cached_articles, is_historical_backfill=False)
 
         # Step 4: Compute per-country signals & min-max conflict intensity
         signals = await compute_and_save_country_signals(conn, target_date, sentiment_results)

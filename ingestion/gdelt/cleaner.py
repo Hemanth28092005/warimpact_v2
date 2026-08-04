@@ -53,6 +53,8 @@ def clean_event(raw_event: RawGdeltEvent) -> CleanGdeltEvent:
         raise ValueError("event_date predates GDELT coverage floor")
     if raw_event.sql_date > datetime.now(UTC).date():
         raise ValueError("event_date is in the future")
+    if raw_event.date_added and abs((raw_event.sql_date - raw_event.date_added.date()).days) > 30:
+        raise ValueError("event_date deviates too far from ingestion date_added")
 
     return CleanGdeltEvent(
         global_event_id=raw_event.global_event_id,

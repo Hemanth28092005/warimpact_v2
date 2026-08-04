@@ -114,7 +114,7 @@ async def _fetch_with_health(
     last_error: Exception | None = None
     for attempt in range(1, len(FETCH_RETRY_DELAYS_SECONDS) + 2):
         try:
-            with httpx.Client(timeout=30.0, follow_redirects=True) as client:
+            with httpx.Client(timeout=30.0, follow_redirects=True, verify=False) as client:
                 response = client.get(url)
                 response.raise_for_status()
                 content = response.content
