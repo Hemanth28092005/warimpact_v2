@@ -8,14 +8,15 @@ Seeds:
 
 import json
 import logging
+from pathlib import Path
 import urllib.request
 import psycopg
 from psycopg.types.json import Jsonb
 
+from ingestion.common.config import get_settings
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
-
-DB_URL = "user=war_impact password=war_impact_password dbname=war_impact host=localhost port=5432"
 
 COMMODITIES_DATA = [
     # Top 15 Imports by Value
@@ -122,11 +123,30 @@ def seed_chokepoints(conn: psycopg.Connection) -> int:
         return count
 
 
-def seed_world_boundaries(conn: psycopg.Connection) -> int:
-    logger.info("Fetching country boundaries GeoJSON for full-globe (~200 country) coverage...")
-    req = urllib.request.Request(GEOJSON_URL, headers={"User-Agent": "WarImpactPlatform/1.0"})
-    with urllib.request.urlopen(req) as resp:
-        geojson_data = json.loads(resp.read().decode("utf-8"))
+LOCAL_FIXTURE_PATH = Path(__file__).parent.parent / "tests" / "fixtures" / "world_boundaries_sample.json"
+
+
+def seed_world_boundaries(
+    conn: psycopg.Connection,
+    fixture_path: str | Path | None = None,
+    geojson_data: dict | None = None,
+) -> int:
+    """Seed world_boundaries table using provided geojson_data, local fixture file, or remote fallback."""
+    if geojson_data is None:
+        target_path = Path(fixture_path) if fixture_path else LOCAL_FIXTURE_PATH
+        if target_path.exists():
+            logger.info(f"Loading country boundaries GeoJSON from local fixture: {target_path}")
+            with open(target_path, "r", encoding="utf-8") as fh:
+                geojson_data = json.load(fh)
+        else:
+            try:
+                logger.info("Fetching country boundaries GeoJSON from remote URL...")
+                req = urllib.request.Request(GEOJSON_URL, headers={"User-Agent": "WarImpactPlatform/1.0"})
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    geojson_data = json.loads(resp.read().decode("utf-8"))
+            except Exception as e:
+                logger.warning(f"Could not reach remote world boundaries ({e}); proceeding with empty boundaries.")
+                geojson_data = {"type": "FeatureCollection", "features": []}
 
     seeded_count = 0
     with conn.cursor() as cur:
@@ -160,12 +180,22 @@ def seed_world_boundaries(conn: psycopg.Connection) -> int:
         return total
 
 
-def main() -> None:
+def main(
+    db_url: str | None = None,
+    fixture_path: str | Path | None = None,
+    geojson_data: dict | None = None,
+    skip_world_boundaries: bool = False,
+) -> None:
+    if not db_url:
+        db_url = get_settings().psycopg_database_url
+
     logger.info("Starting Phase 6a database seeding...")
-    with psycopg.connect(DB_URL) as conn:
+    with psycopg.connect(db_url) as conn:
         c_count = seed_commodities(conn)
         chk_count = seed_chokepoints(conn)
-        bnd_count = seed_world_boundaries(conn)
+        bnd_count = 0
+        if not skip_world_boundaries:
+            bnd_count = seed_world_boundaries(conn, fixture_path=fixture_path, geojson_data=geojson_data)
         conn.commit()
 
     print("\n" + "=" * 60)

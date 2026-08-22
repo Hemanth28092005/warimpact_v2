@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
-
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes.aggression import router as aggression_router
 from api.routes.cascade import cascade_router
 from api.routes.cii import router as cii_router
+from api.routes.dashboard import router as dashboard_router
 from api.routes.health import router as health_router
 from api.routes.live_feed import router as live_feed_router
 
@@ -31,6 +31,7 @@ app.include_router(cii_router)
 app.include_router(aggression_router)
 app.include_router(live_feed_router)
 app.include_router(cascade_router)
+app.include_router(dashboard_router)
 app.include_router(health_router)
 
 

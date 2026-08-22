@@ -13,9 +13,9 @@ import logging
 from typing import Any
 import psycopg
 
-logger = logging.getLogger(__name__)
+from ingestion.common.config import get_settings
 
-DB_URL = "user=war_impact password=war_impact_password dbname=war_impact host=localhost port=5432"
+logger = logging.getLogger(__name__)
 
 # Real bilateral trade partner mappings per commodity (ISO3, Origin Lat/Lon, Primary Chokepoint)
 # Sourced from India Ministry of Commerce & Industry / DGFT & UN Comtrade statistics 2023-2024
@@ -175,13 +175,16 @@ COMMODITY_PARTNERS_MAP = {
 }
 
 
-def update_india_trade_routes() -> dict[str, Any]:
-    """Update trade routes and compute route risk scores for all tracked commodities."""
+def update_india_trade_routes(db_url: str | None = None) -> dict[str, Any]:
+    """Ingest and update India trade routes for all tracked commodities."""
+    if not db_url:
+        db_url = get_settings().psycopg_database_url
+
     logger.info("Starting India trade routes calculation pipeline...")
     routes_updated = 0
     missing_partners = []
 
-    with psycopg.connect(DB_URL) as conn:
+    with psycopg.connect(db_url) as conn:
         with conn.cursor() as cur:
             # Fetch latest CII scores
             cur.execute("SELECT country_code, cii_score FROM country_instability_index ORDER BY score_date DESC;")

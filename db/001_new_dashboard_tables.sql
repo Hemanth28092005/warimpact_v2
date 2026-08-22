@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS regional_headlines (
     gdelt_event_id BIGINT REFERENCES gdelt_events(global_event_id) ON DELETE SET NULL,
     source_url TEXT,
     published_at TIMESTAMPTZ,
+    llm_brief TEXT,
+    validation_source VARCHAR(10),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT uq_regional_headlines_region_rank UNIQUE (region, rank)
 );
@@ -57,6 +59,8 @@ CREATE TABLE IF NOT EXISTS government_actions (
     gdelt_event_id BIGINT REFERENCES gdelt_events(global_event_id) ON DELETE SET NULL,
     source_url TEXT,
     published_at TIMESTAMPTZ,
+    llm_brief TEXT,
+    validation_source VARCHAR(10),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -71,6 +75,8 @@ CREATE TABLE IF NOT EXISTS protests (
     gdelt_event_id BIGINT REFERENCES gdelt_events(global_event_id) ON DELETE SET NULL,
     source_url TEXT,
     event_severity NUMERIC(5, 2) NOT NULL DEFAULT 0.0,
+    llm_brief TEXT,
+    validation_source VARCHAR(10),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT uq_protests_city_date_headline UNIQUE (city, event_date, headline)
 );

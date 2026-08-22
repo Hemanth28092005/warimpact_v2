@@ -29,3 +29,9 @@ celerybeat-schedule*
 
 db/alembic/versions/__pycache__/
 *.sqlite3
+
+# Local operational audit state and test-run artifacts
+scripts/.dashboard_repair_pending_token.json
+scripts/.prod_rowcount_snapshot.json
+scripts/dashboard_repair_audit.jsonl
+scratch/pytest-isolated-temp/

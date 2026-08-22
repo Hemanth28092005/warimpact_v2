@@ -6,42 +6,25 @@ Algorithm:
       co_spike_count = count of dates D in S_A where B spiked on any date in [D, D + window_days]
       contagion_score = co_spike_count / len(S_A)
 
-Non-Negotiable System Limitations & Analytical Disclaimers:
-1. Correlation != Causation:
-   Shared external macro shocks (e.g., a global or regional crisis affecting multiple countries
-   simultaneously) can produce co-occurring CII spikes without direct contagion between the countries.
-
-2. Statistical Association Measure:
-   contagion_score measures empirical temporal co-occurrence of statistical outliers within an N-day window.
-   It is NOT a structural or causal dynamic model.
-
-3. Signal Confounding & Spurious Correlations:
-   CII is derived from GDELT conflict and sentiment signals. Without cross-referencing secondary streams
-   (e.g., Phase 5 trade exposure, bilateral capital flows), spurious correlations cannot be ruled out.
-
-4. Fixed-Sigma Spike Threshold Bias:
-   Because spike detection uses an absolute K*std threshold, it is miscalibrated across countries with
-   different baseline volatility. Stable countries with naturally low CII variance (e.g. ESP, std~3.65)
-   register 'spikes' from routine noise (+3-10 point moves) far more often than chronically volatile countries
-   (e.g. YEM, std much higher, operating near the 100.00 score ceiling), where even severe real escalations
-   often fail to exceed a 2-sigma threshold. Empirically: ESP registered 46 spike days vs. YEM's 11, despite
-   YEM undergoing well-documented severe escalation during this period. Consequently, cascade contagion scores
-   for conflict-cluster country pairs (e.g. SYR-YEM, SDN-SSD, ISR-SYR: 0.00-0.25) are systematically LOWER
-   than for stable-country pairs (e.g. DEU-ITA, USA-CAN: 0.48-0.73) — this should NOT be read as evidence
-   that contagion is weaker among conflict-prone countries; it is a detector calibration artifact.
+Freshness Gating & State Tracking:
+- Gated on CII freshness: Verifies MAX(score_date) in country_instability_index >= target_date - 7 days.
+- If upstream CII is stale or empty, refuses to overwrite current cascade scores and records 'stale_input' / 'insufficient_data'.
+- Tracks all executions in the `cascade_runs` table.
 """
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 from psycopg import AsyncConnection
 
 from models.cascade.adjacency import build_country_adjacency_graph, CountryAdjacencyGraph
-from models.cascade.spike import detect_country_spikes, DEFAULT_K
+from models.cascade.spike import detect_country_spikes, load_active_model_version, DEFAULT_K
 
 DEFAULT_WINDOW_DAYS: int = 7
+CII_STALENESS_THRESHOLD_DAYS: int = 7
 
 
 @dataclass
@@ -56,30 +39,122 @@ class CascadePairResult:
     analysis_end_date: date
 
 
+@dataclass
+class CascadeRunExecution:
+    run_id: uuid.UUID
+    started_at: datetime
+    completed_at: datetime | None
+    calculation_status: str  # 'computed', 'no_spikes', 'insufficient_data', 'stale_input', 'failed'
+    failure_reason: str | None
+    cii_max_score_date: date | None
+    source_data_freshness_hours: float | None
+    model_version: str
+    window_days: int
+    pairs_calculated: int
+    pairs_published: int
+    results: list[CascadePairResult]
+
+
+async def check_cii_freshness(
+    conn: AsyncConnection,
+    model_version: str | None = None,
+    target_date: date | None = None,
+) -> tuple[bool, date | None, float | None, str | None]:
+    """Check whether upstream CII predictions in country_instability_index are fresh and sufficient.
+
+    Returns:
+        (is_fresh: bool, max_score_date: date | None, freshness_hours: float | None, reason: str | None)
+    """
+    if model_version is None:
+        model_version = load_active_model_version()
+    if target_date is None:
+        target_date = date.today()
+
+    async with conn.cursor() as cur:
+        await cur.execute(
+            """
+            SELECT MAX(score_date), COUNT(*)
+            FROM country_instability_index
+            WHERE model_version = %s;
+            """,
+            (model_version,),
+        )
+        row = await cur.fetchone()
+        max_date = row[0] if row else None
+        total_rows = row[1] if row else 0
+
+        # Fallback to check across any model_version if specific one is empty
+        if not max_date:
+            await cur.execute("SELECT MAX(score_date), COUNT(*) FROM country_instability_index;")
+            row_fallback = await cur.fetchone()
+            max_date = row_fallback[0] if row_fallback else None
+            total_rows = row_fallback[1] if row_fallback else 0
+
+    if not max_date or total_rows < 100:
+        return False, max_date, None, f"Insufficient CII data in country_instability_index (found {total_rows} rows)"
+
+    days_lag = (target_date - max_date).days
+    freshness_hours = round(days_lag * 24.0, 1)
+
+    if days_lag > CII_STALENESS_THRESHOLD_DAYS:
+        return (
+            False,
+            max_date,
+            freshness_hours,
+            f"Upstream CII data is stale: MAX(score_date)={max_date} lags target date {target_date} by {days_lag} days (> {CII_STALENESS_THRESHOLD_DAYS}d threshold)",
+        )
+
+    return True, max_date, freshness_hours, None
+
+
 async def compute_cascade_contagion(
     conn: AsyncConnection,
     window_days: int = DEFAULT_WINDOW_DAYS,
     k: float = DEFAULT_K,
     top_n_event_links: int = 5,
-) -> list[CascadePairResult]:
-    """Execute BFS cascade analysis across graph neighbors and compute contagion scores.
+    model_version: str | None = None,
+    target_date: date | None = None,
+) -> CascadeRunExecution:
+    """Execute BFS cascade analysis across graph neighbors with strict freshness gating.
 
-    Args:
-        conn: Async PostgreSQL connection.
-        window_days: Trailing window in days to detect target co-spikes (default 7).
-        k: Rolling stddev multiplier for spike threshold (default 2.0).
-        top_n_event_links: Top bilateral event volume pairs for graph construction.
-
-    Returns:
-        List of CascadePairResult for all evaluated adjacency pairs.
+    Returns CascadeRunExecution with calculation status, metadata, and results.
     """
-    # 1. Build adjacency graph (border + event-linkage)
+    run_id = uuid.uuid4()
+    started_at = datetime.now(timezone.utc)
+    if model_version is None:
+        model_version = load_active_model_version()
+    if target_date is None:
+        target_date = date.today()
+
+    # Step 1: Enforce CII Freshness Gate
+    is_fresh, max_cii_date, freshness_hours, failure_reason = await check_cii_freshness(
+        conn, model_version=model_version, target_date=target_date
+    )
+
+    if not is_fresh:
+        calc_status = "insufficient_data" if max_cii_date is None else "stale_input"
+        return CascadeRunExecution(
+            run_id=run_id,
+            started_at=started_at,
+            completed_at=datetime.now(timezone.utc),
+            calculation_status=calc_status,
+            failure_reason=failure_reason,
+            cii_max_score_date=max_cii_date,
+            source_data_freshness_hours=freshness_hours,
+            model_version=model_version,
+            window_days=window_days,
+            pairs_calculated=0,
+            pairs_published=0,
+            results=[],
+        )
+
+    # Step 2: Build adjacency graph
     graph = await build_country_adjacency_graph(conn, top_n_event_links=top_n_event_links)
 
-    # 2. Detect spike dates for all countries
-    country_spikes = await detect_country_spikes(conn, k=k)
+    # Step 3: Detect spike dates for all countries
+    country_spikes = await detect_country_spikes(conn, k=k, model_version=model_version)
 
-    # 3. Determine analysis date range
+    # Step 4: Determine analysis date range
     async with conn.cursor() as cur:
         await cur.execute("SELECT MIN(score_date), MAX(score_date) FROM country_instability_index")
         r = await cur.fetchone()
@@ -87,8 +162,25 @@ async def compute_cascade_contagion(
         end_date = r[1] if r and r[1] else date(2026, 7, 31)
 
     results: list[CascadePairResult] = []
+    total_spikes = sum(len(spikes) for spikes in country_spikes.values())
 
-    # 4. For each source country, evaluate graph neighbors
+    if total_spikes == 0:
+        return CascadeRunExecution(
+            run_id=run_id,
+            started_at=started_at,
+            completed_at=datetime.now(timezone.utc),
+            calculation_status="no_spikes",
+            failure_reason=f"No CII spikes exceeded threshold K={k} during analysis window",
+            cii_max_score_date=max_cii_date,
+            source_data_freshness_hours=freshness_hours,
+            model_version=model_version,
+            window_days=window_days,
+            pairs_calculated=0,
+            pairs_published=0,
+            results=[],
+        )
+
+    # Step 5: For each source country, evaluate graph neighbors
     for source in graph.nodes:
         source_spikes = country_spikes.get(source, set())
         source_count = len(source_spikes)
@@ -100,7 +192,6 @@ async def compute_cascade_contagion(
             co_spike_count = 0
             if source_count > 0:
                 for spike_d in source_spikes:
-                    # Check if target spiked on any day in [spike_d, spike_d + window_days]
                     has_co_spike = any(
                         (spike_d + timedelta(days=d_offset)) in target_spikes
                         for d_offset in range(window_days + 1)
@@ -123,4 +214,17 @@ async def compute_cascade_contagion(
                 )
             )
 
-    return results
+    return CascadeRunExecution(
+        run_id=run_id,
+        started_at=started_at,
+        completed_at=datetime.now(timezone.utc),
+        calculation_status="computed",
+        failure_reason=None,
+        cii_max_score_date=max_cii_date,
+        source_data_freshness_hours=freshness_hours,
+        model_version=model_version,
+        window_days=window_days,
+        pairs_calculated=len(results),
+        pairs_published=len(results),
+        results=results,
+    )

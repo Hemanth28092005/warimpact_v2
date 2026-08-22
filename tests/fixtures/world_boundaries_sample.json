@@ -1,0 +1,115 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "ADMIN": "India",
+        "ISO_A3": "IND"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[68.1, 23.6], [74.8, 37.0], [97.3, 28.2], [80.3, 6.7], [68.1, 23.6]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADMIN": "United States of America",
+        "ISO_A3": "USA"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-124.7, 49.0], [-66.9, 44.8], [-80.2, 25.1], [-117.2, 32.5], [-124.7, 49.0]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADMIN": "China",
+        "ISO_A3": "CHN"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[73.5, 39.4], [134.7, 48.4], [117.3, 23.5], [100.9, 21.1], [73.5, 39.4]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADMIN": "Russia",
+        "ISO_A3": "RUS"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[19.9, 54.4], [169.0, 66.0], [131.9, 42.8], [40.0, 43.5], [19.9, 54.4]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADMIN": "Saudi Arabia",
+        "ISO_A3": "SAU"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[34.5, 29.3], [55.6, 22.0], [50.1, 16.4], [39.0, 16.0], [34.5, 29.3]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADMIN": "Iran",
+        "ISO_A3": "IRN"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[44.0, 39.7], [63.3, 37.3], [61.8, 25.0], [48.5, 30.0], [44.0, 39.7]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADMIN": "Israel",
+        "ISO_A3": "ISR"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[34.2, 31.2], [35.6, 33.2], [35.5, 29.5], [34.9, 29.5], [34.2, 31.2]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADMIN": "Egypt",
+        "ISO_A3": "EGY"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[25.0, 31.6], [36.9, 22.0], [25.0, 22.0], [25.0, 31.6]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADMIN": "United Arab Emirates",
+        "ISO_A3": "ARE"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[51.5, 24.0], [56.3, 26.0], [56.0, 22.8], [51.5, 24.0]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ADMIN": "Singapore",
+        "ISO_A3": "SGP"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[103.6, 1.4], [104.0, 1.4], [104.0, 1.2], [103.6, 1.2], [103.6, 1.4]]]
+      }
+    }
+  ]
+}
