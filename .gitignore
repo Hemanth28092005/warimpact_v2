@@ -32,6 +32,7 @@ db/alembic/versions/__pycache__/
 
 # Local operational audit state and test-run artifacts
 scripts/.dashboard_repair_pending_token.json
+scripts/.cache_repair_pending_token.json
 scripts/.prod_rowcount_snapshot.json
 scripts/dashboard_repair_audit.jsonl
-scratch/pytest-isolated-temp/
+scratch/

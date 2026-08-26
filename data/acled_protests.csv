@@ -1,0 +1,172 @@
+week,region,country,admin1,event_type,sub_event_type,events,fatalities,population_exposure,disorder_type,centroid_latitude,centroid_longitude
+2026-08-15,"South Asia",Bangladesh,Barisal,Protests,"Peaceful protest",2,0,0,Demonstrations,22.429,90.236
+2026-08-15,"South Asia",Bangladesh,Chittagong,Riots,"Mob violence",5,0,0,"Political violence",22.246,92.213
+2026-08-15,"South Asia",Bangladesh,Chittagong,"Strategic developments",Agreement,1,0,0,"Strategic developments",22.246,92.213
+2026-08-15,"South Asia",Bangladesh,Chittagong,"Strategic developments",Other,1,0,0,"Strategic developments",22.246,92.213
+2026-08-15,"South Asia",Bangladesh,Chittagong,Protests,"Peaceful protest",2,0,"38,579",Demonstrations,22.246,92.213
+2026-08-15,"South Asia",Bangladesh,Dhaka,"Strategic developments",Other,1,0,0,"Strategic developments",23.819,90.220
+2026-08-15,"South Asia",Bangladesh,Dhaka,Riots,"Mob violence",6,1,"112,245","Political violence",23.819,90.220
+2026-08-15,"South Asia",Bangladesh,Dhaka,"Violence against civilians",Attack,2,2,"187,221","Political violence",23.819,90.220
+2026-08-15,"South Asia",Bangladesh,Dhaka,Protests,"Peaceful protest",6,0,"112,245",Demonstrations,23.819,90.220
+2026-08-15,"South Asia",Bangladesh,Dhaka,"Strategic developments","Disrupted weapons use",1,0,0,"Strategic developments",23.819,90.220
+2026-08-15,"South Asia",Bangladesh,Dhaka,Riots,"Violent demonstration",1,0,"61,028",Demonstrations,23.819,90.220
+2026-08-15,"South Asia",Bangladesh,Dhaka,"Strategic developments","Looting/property destruction",1,0,0,"Strategic developments",23.819,90.220
+2026-08-15,"South Asia",Bangladesh,Khulna,Riots,"Violent demonstration",1,0,"71,472",Demonstrations,23.139,89.328
+2026-08-15,"South Asia",Bangladesh,Khulna,"Strategic developments",Other,1,0,0,"Strategic developments",23.139,89.328
+2026-08-15,"South Asia",Bangladesh,Khulna,Riots,"Mob violence",4,1,"119,523","Political violence",23.139,89.328
+2026-08-15,"South Asia",Bangladesh,Khulna,"Strategic developments","Disrupted weapons use",1,0,0,"Strategic developments",23.139,89.328
+2026-08-15,"South Asia",Bangladesh,Mymensingh,Riots,"Mob violence",1,1,0,"Political violence",24.824,90.418
+2026-08-15,"South Asia",Bangladesh,Mymensingh,Protests,"Peaceful protest",1,0,0,Demonstrations,24.824,90.418
+2026-08-15,"South Asia",Bangladesh,Mymensingh,Riots,"Violent demonstration",1,0,0,Demonstrations,24.824,90.418
+2026-08-15,"South Asia",Bangladesh,Rajshahi,Protests,"Peaceful protest",1,0,"22,551",Demonstrations,24.554,88.933
+2026-08-15,"South Asia",Bangladesh,Rajshahi,"Violence against civilians",Attack,1,0,0,"Political violence",24.554,88.933
+2026-08-15,"South Asia",Bangladesh,Rajshahi,Riots,"Mob violence",3,0,0,"Political violence",24.554,88.933
+2026-08-15,"South Asia",Bangladesh,Rangpur,Protests,"Peaceful protest",2,0,"21,941",Demonstrations,25.897,88.967
+2026-08-15,"South Asia",Bangladesh,Sylhet,Protests,"Peaceful protest",1,0,0,Demonstrations,24.599,91.715
+2026-08-15,"South Asia",Bangladesh,Sylhet,"Strategic developments","Disrupted weapons use",1,0,0,"Strategic developments",24.599,91.715
+2026-08-15,"South Asia",Bangladesh,Sylhet,Riots,"Mob violence",1,0,0,"Political violence",24.599,91.715
+2026-08-15,"South Asia",India,"Andaman and Nicobar Islands",Protests,"Peaceful protest",8,0,"17,161",Demonstrations,12.603,92.825
+2026-08-15,"South Asia",India,"Andhra Pradesh",Protests,"Peaceful protest",22,0,"273,248",Demonstrations,15.897,79.622
+2026-08-15,"South Asia",India,Assam,Riots,"Mob violence",3,0,0,"Political violence",26.053,90.762
+2026-08-15,"South Asia",India,Assam,Protests,"Peaceful protest",22,0,"84,495",Demonstrations,26.053,90.762
+2026-08-15,"South Asia",India,Assam,"Strategic developments",Other,1,0,0,"Strategic developments",26.053,90.762
+2026-08-15,"South Asia",India,Bihar,"Strategic developments","Disrupted weapons use",1,0,0,"Strategic developments",25.903,86.125
+2026-08-15,"South Asia",India,Bihar,Protests,"Protest with intervention",1,0,"81,650",Demonstrations,25.903,86.125
+2026-08-15,"South Asia",India,Bihar,Riots,"Violent demonstration",1,0,0,Demonstrations,25.903,86.125
+2026-08-15,"South Asia",India,Bihar,Protests,"Peaceful protest",4,0,"81,650",Demonstrations,25.903,86.125
+2026-08-15,"South Asia",India,Chandigarh,Protests,"Peaceful protest",2,0,"39,933",Demonstrations,30.726,76.787
+2026-08-15,"South Asia",India,Chhattisgarh,Protests,"Peaceful protest",3,0,"33,770",Demonstrations,20.950,81.509
+2026-08-15,"South Asia",India,Delhi,"Strategic developments",Arrests,1,0,0,"Strategic developments",28.645,77.123
+2026-08-15,"South Asia",India,Delhi,Protests,"Peaceful protest",6,0,"255,653",Demonstrations,28.645,77.123
+2026-08-15,"South Asia",India,Delhi,Riots,"Mob violence",1,0,0,"Political violence",28.645,77.123
+2026-08-15,"South Asia",India,Delhi,Protests,"Protest with intervention",1,0,"76,637",Demonstrations,28.645,77.123
+2026-08-15,"South Asia",India,Delhi,Riots,"Violent demonstration",1,0,0,Demonstrations,28.645,77.123
+2026-08-15,"South Asia",India,Goa,Protests,"Peaceful protest",3,0,0,Demonstrations,15.351,74.104
+2026-08-15,"South Asia",India,Gujarat,Protests,"Protest with intervention",1,0,"29,446",Demonstrations,22.416,72.043
+2026-08-15,"South Asia",India,Gujarat,Riots,"Violent demonstration",1,0,0,Demonstrations,22.416,72.043
+2026-08-15,"South Asia",India,Gujarat,Protests,"Peaceful protest",1,0,0,Demonstrations,22.416,72.043
+2026-08-15,"South Asia",India,Haryana,"Strategic developments",Other,1,0,0,"Strategic developments",29.294,76.053
+2026-08-15,"South Asia",India,Haryana,"Strategic developments",Arrests,1,0,0,"Strategic developments",29.294,76.053
+2026-08-15,"South Asia",India,Haryana,Riots,"Violent demonstration",1,0,0,Demonstrations,29.294,76.053
+2026-08-15,"South Asia",India,Haryana,Protests,"Peaceful protest",22,0,"224,666",Demonstrations,29.294,76.053
+2026-08-15,"South Asia",India,Haryana,Protests,"Protest with intervention",1,0,0,Demonstrations,29.294,76.053
+2026-08-15,"South Asia",India,Haryana,"Violence against civilians",Attack,1,0,0,"Political violence",29.294,76.053
+2026-08-15,"South Asia",India,"Himachal Pradesh",Protests,"Peaceful protest",11,0,"45,870",Demonstrations,31.816,77.322
+2026-08-15,"South Asia",India,"Jammu and Kashmir",Protests,"Peaceful protest",47,0,"169,791",Demonstrations,33.531,75.181
+2026-08-15,"South Asia",India,"Jammu and Kashmir",Protests,"Protest with intervention",1,0,"13,734",Demonstrations,33.531,75.181
+2026-08-15,"South Asia",India,"Jammu and Kashmir","Violence against civilians",Attack,1,0,"1,368","Political violence",33.531,75.181
+2026-08-15,"South Asia",India,"Jammu and Kashmir","Strategic developments","Disrupted weapons use",1,0,0,"Strategic developments",33.531,75.181
+2026-08-15,"South Asia",India,Jharkhand,Protests,"Protest with intervention",2,0,"103,340",Demonstrations,23.652,85.167
+2026-08-15,"South Asia",India,Jharkhand,Protests,"Peaceful protest",4,0,"54,145",Demonstrations,23.652,85.167
+2026-08-15,"South Asia",India,Jharkhand,"Strategic developments",Other,1,0,0,"Strategic developments",23.652,85.167
+2026-08-15,"South Asia",India,Jharkhand,"Strategic developments",Arrests,1,0,0,"Strategic developments",23.652,85.167
+2026-08-15,"South Asia",India,Karnataka,Protests,"Peaceful protest",80,0,"530,264",Demonstrations,15.021,75.534
+2026-08-15,"South Asia",India,Karnataka,Riots,"Violent demonstration",2,0,"106,783",Demonstrations,15.021,75.534
+2026-08-15,"South Asia",India,Karnataka,Protests,"Protest with intervention",4,0,"69,080",Demonstrations,15.021,75.534
+2026-08-15,"South Asia",India,Karnataka,Riots,"Mob violence",1,1,0,"Political violence",15.021,75.534
+2026-08-15,"South Asia",India,Kerala,Protests,"Peaceful protest",7,0,"33,051",Demonstrations,10.540,76.454
+2026-08-15,"South Asia",India,Kerala,Riots,"Violent demonstration",1,0,0,Demonstrations,10.540,76.454
+2026-08-15,"South Asia",India,"Madhya Pradesh",Protests,"Peaceful protest",14,0,"77,176",Demonstrations,23.972,79.393
+2026-08-15,"South Asia",India,"Madhya Pradesh","Violence against civilians",Attack,1,1,0,"Political violence",23.972,79.393
+2026-08-15,"South Asia",India,Maharashtra,Protests,"Peaceful protest",6,0,"125,590",Demonstrations,18.817,75.426
+2026-08-15,"South Asia",India,Maharashtra,Riots,"Mob violence",1,0,0,"Political violence",18.817,75.426
+2026-08-15,"South Asia",India,Manipur,Protests,"Peaceful protest",79,0,"109,311",Demonstrations,24.764,93.865
+2026-08-15,"South Asia",India,Manipur,"Violence against civilians",Attack,1,0,0,"Political violence",24.764,93.865
+2026-08-15,"South Asia",India,Manipur,"Strategic developments","Disrupted weapons use",5,0,0,"Strategic developments",24.764,93.865
+2026-08-15,"South Asia",India,Manipur,Protests,"Protest with intervention",2,0,"27,211",Demonstrations,24.764,93.865
+2026-08-15,"South Asia",India,Manipur,Riots,"Violent demonstration",4,0,"133,602",Demonstrations,24.764,93.865
+2026-08-15,"South Asia",India,Manipur,"Strategic developments",Agreement,1,0,0,"Strategic developments",24.764,93.865
+2026-08-15,"South Asia",India,Meghalaya,Protests,"Peaceful protest",3,0,"17,241",Demonstrations,25.578,91.269
+2026-08-15,"South Asia",India,Meghalaya,Riots,"Mob violence",11,0,"89,600","Political violence",25.578,91.269
+2026-08-15,"South Asia",India,Meghalaya,Riots,"Violent demonstration",1,0,"89,600",Demonstrations,25.578,91.269
+2026-08-15,"South Asia",India,Odisha,Riots,"Violent demonstration",1,0,"167,999",Demonstrations,20.189,84.472
+2026-08-15,"South Asia",India,Odisha,Protests,"Peaceful protest",4,0,"42,197",Demonstrations,20.189,84.472
+2026-08-15,"South Asia",India,Puducherry,Protests,"Peaceful protest",1,0,0,Demonstrations,11.927,79.780
+2026-08-15,"South Asia",India,Punjab,"Strategic developments",Other,1,0,0,"Strategic developments",31.024,75.581
+2026-08-15,"South Asia",India,Punjab,"Strategic developments","Looting/property destruction",1,0,0,"Strategic developments",31.024,75.581
+2026-08-15,"South Asia",India,Punjab,"Strategic developments",Arrests,1,0,0,"Strategic developments",31.024,75.581
+2026-08-15,"South Asia",India,Punjab,Protests,"Protest with intervention",3,0,"37,678",Demonstrations,31.024,75.581
+2026-08-15,"South Asia",India,Punjab,"Strategic developments","Disrupted weapons use",3,0,0,"Strategic developments",31.024,75.581
+2026-08-15,"South Asia",India,Punjab,Protests,"Peaceful protest",64,0,"306,460",Demonstrations,31.024,75.581
+2026-08-15,"South Asia",India,Punjab,Riots,"Mob violence",2,1,"63,431","Political violence",31.024,75.581
+2026-08-15,"South Asia",India,Rajasthan,Riots,"Violent demonstration",3,0,"113,274",Demonstrations,26.628,73.826
+2026-08-15,"South Asia",India,Rajasthan,Protests,"Peaceful protest",3,0,"63,901",Demonstrations,26.628,73.826
+2026-08-15,"South Asia",India,Rajasthan,Riots,"Mob violence",1,0,0,"Political violence",26.628,73.826
+2026-08-15,"South Asia",India,"Tamil Nadu",Riots,"Mob violence",2,0,0,"Political violence",10.821,78.342
+2026-08-15,"South Asia",India,"Tamil Nadu",Protests,"Peaceful protest",21,0,"278,899",Demonstrations,10.821,78.342
+2026-08-15,"South Asia",India,"Tamil Nadu",Riots,"Violent demonstration",1,0,"24,315",Demonstrations,10.821,78.342
+2026-08-15,"South Asia",India,Telangana,Protests,"Peaceful protest",68,0,"370,374",Demonstrations,17.875,79.306
+2026-08-15,"South Asia",India,Telangana,Protests,"Protest with intervention",5,0,"129,687",Demonstrations,17.875,79.306
+2026-08-15,"South Asia",India,Telangana,Riots,"Mob violence",2,1,0,"Political violence",17.875,79.306
+2026-08-15,"South Asia",India,Telangana,Riots,"Violent demonstration",1,0,0,Demonstrations,17.875,79.306
+2026-08-15,"South Asia",India,Tripura,Protests,"Peaceful protest",12,0,"44,564",Demonstrations,23.735,91.554
+2026-08-15,"South Asia",India,Tripura,Riots,"Mob violence",1,0,0,"Political violence",23.735,91.554
+2026-08-15,"South Asia",India,Tripura,Riots,"Violent demonstration",1,0,"15,980",Demonstrations,23.735,91.554
+2026-08-15,"South Asia",India,"Uttar Pradesh",Protests,"Protest with intervention",1,0,0,Demonstrations,27.133,80.782
+2026-08-15,"South Asia",India,"Uttar Pradesh","Violence against civilians",Attack,1,0,"257,794","Political violence",27.133,80.782
+2026-08-15,"South Asia",India,"Uttar Pradesh",Riots,"Violent demonstration",1,0,0,Demonstrations,27.133,80.782
+2026-08-15,"South Asia",India,"Uttar Pradesh","Strategic developments",Arrests,1,0,0,"Strategic developments",27.133,80.782
+2026-08-15,"South Asia",India,"Uttar Pradesh",Protests,"Peaceful protest",20,0,"314,583",Demonstrations,27.133,80.782
+2026-08-15,"South Asia",India,"Uttar Pradesh",Riots,"Mob violence",2,0,"272,371","Political violence",27.133,80.782
+2026-08-15,"South Asia",India,"Uttar Pradesh","Strategic developments","Looting/property destruction",1,0,0,"Strategic developments",27.133,80.782
+2026-08-15,"South Asia",India,Uttarakhand,Protests,"Peaceful protest",2,0,"25,712",Demonstrations,29.996,79.237
+2026-08-15,"South Asia",India,Uttarakhand,"Violence against civilians",Attack,1,0,"101,193","Political violence",29.996,79.237
+2026-08-15,"South Asia",India,"West Bengal",Riots,"Mob violence",1,0,"276,154","Political violence",24.390,88.099
+2026-08-15,"South Asia",India,"West Bengal",Protests,"Protest with intervention",1,0,0,Demonstrations,24.390,88.099
+2026-08-15,"South Asia",India,"West Bengal","Strategic developments","Disrupted weapons use",1,0,0,"Strategic developments",24.390,88.099
+2026-08-15,"South Asia",India,"West Bengal","Strategic developments","Looting/property destruction",1,0,0,"Strategic developments",24.390,88.099
+2026-08-15,"South Asia",India,"West Bengal","Violence against civilians",Attack,1,2,0,"Political violence",24.390,88.099
+2026-08-15,"South Asia",India,"West Bengal",Protests,"Peaceful protest",20,0,"233,965",Demonstrations,24.390,88.099
+2026-08-15,"South Asia",India,"West Bengal",Riots,"Violent demonstration",4,0,"276,154",Demonstrations,24.390,88.099
+2026-08-15,"International Waters","Indian Ocean","North Indian Ocean","Strategic developments","Change to group/activity",1,0,0,"Strategic developments",13.728,70.473
+2026-08-15,"South Asia",Maldives,"Addu City",Protests,"Peaceful protest",1,0,0,Demonstrations,-0.694,73.157
+2026-08-15,"South Asia",Nepal,Bagmati,Protests,"Peaceful protest",10,0,"75,039",Demonstrations,27.652,85.393
+2026-08-15,"South Asia",Nepal,Bagmati,"Strategic developments",Other,1,0,0,"Strategic developments",27.652,85.393
+2026-08-15,"South Asia",Nepal,Gandaki,"Strategic developments","Disrupted weapons use",1,0,0,"Strategic developments",28.382,84.036
+2026-08-15,"South Asia",Nepal,Koshi,Riots,"Mob violence",1,0,0,"Political violence",27.228,87.180
+2026-08-15,"South Asia",Nepal,Koshi,"Strategic developments","Disrupted weapons use",1,0,0,"Strategic developments",27.228,87.180
+2026-08-15,"South Asia",Nepal,Koshi,Protests,"Peaceful protest",4,0,0,Demonstrations,27.228,87.180
+2026-08-15,"South Asia",Nepal,Lumbini,Protests,"Peaceful protest",2,0,0,Demonstrations,28.100,82.522
+2026-08-15,"South Asia",Nepal,Lumbini,"Strategic developments","Disrupted weapons use",2,0,0,"Strategic developments",28.100,82.522
+2026-08-15,"South Asia",Nepal,Madhesh,Riots,"Violent demonstration",2,0,0,Demonstrations,26.944,85.607
+2026-08-15,"South Asia",Nepal,Madhesh,Riots,"Mob violence",1,0,0,"Political violence",26.944,85.607
+2026-08-15,"South Asia",Nepal,Madhesh,Protests,"Peaceful protest",12,0,"76,924",Demonstrations,26.944,85.607
+2026-08-15,"South Asia",Pakistan,"Azad Jammu and Kashmir",Protests,"Excessive force against protesters",1,0,"16,829","Political violence; Demonstrations",33.943,73.891
+2026-08-15,"South Asia",Pakistan,"Azad Jammu and Kashmir",Protests,"Peaceful protest",4,0,"30,398",Demonstrations,33.943,73.891
+2026-08-15,"South Asia",Pakistan,Balochistan,"Violence against civilians","Abduction/forced disappearance",7,0,"311,918","Political violence",28.460,65.815
+2026-08-15,"South Asia",Pakistan,Balochistan,"Strategic developments","Looting/property destruction",10,0,0,"Strategic developments",28.460,65.815
+2026-08-15,"South Asia",Pakistan,Balochistan,"Explosions/Remote violence","Remote explosive/landmine/IED",10,4,"1,126,502","Political violence",28.460,65.815
+2026-08-15,"South Asia",Pakistan,Balochistan,Battles,"Armed clash",15,56,"362,280","Political violence",28.460,65.815
+2026-08-15,"South Asia",Pakistan,Balochistan,"Strategic developments",Other,1,0,0,"Strategic developments",28.460,65.815
+2026-08-15,"South Asia",Pakistan,Balochistan,"Explosions/Remote violence","Air/drone strike",5,6,"17,387","Political violence",28.460,65.815
+2026-08-15,"South Asia",Pakistan,Balochistan,"Violence against civilians",Attack,6,6,"1,035,477","Political violence",28.460,65.815
+2026-08-15,"South Asia",Pakistan,Balochistan,Protests,"Peaceful protest",7,0,"179,989",Demonstrations,28.460,65.815
+2026-08-15,"South Asia",Pakistan,Balochistan,"Strategic developments","Change to group/activity",1,0,0,"Strategic developments",28.460,65.815
+2026-08-15,"South Asia",Pakistan,Balochistan,"Explosions/Remote violence",Grenade,3,1,"1,003,882","Political violence",28.460,65.815
+2026-08-15,"South Asia",Pakistan,Balochistan,"Strategic developments","Disrupted weapons use",1,0,0,"Strategic developments",28.460,65.815
+2026-08-15,"South Asia",Pakistan,"Federal Capital Territory",Protests,"Peaceful protest",1,0,"17,485",Demonstrations,33.649,73.013
+2026-08-15,"South Asia",Pakistan,"Khyber Pakhtunkhwa","Explosions/Remote violence","Air/drone strike",5,0,"221,381","Political violence",33.993,71.672
+2026-08-15,"South Asia",Pakistan,"Khyber Pakhtunkhwa","Strategic developments","Disrupted weapons use",3,0,0,"Strategic developments",33.993,71.672
+2026-08-15,"South Asia",Pakistan,"Khyber Pakhtunkhwa",Battles,"Armed clash",12,24,"270,313","Political violence",33.993,71.672
+2026-08-15,"South Asia",Pakistan,"Khyber Pakhtunkhwa","Violence against civilians",Attack,5,4,"161,031","Political violence",33.993,71.672
+2026-08-15,"South Asia",Pakistan,"Khyber Pakhtunkhwa","Explosions/Remote violence","Remote explosive/landmine/IED",3,3,0,"Political violence",33.993,71.672
+2026-08-15,"South Asia",Pakistan,"Khyber Pakhtunkhwa","Strategic developments","Looting/property destruction",2,0,0,"Strategic developments",33.993,71.672
+2026-08-15,"South Asia",Pakistan,"Khyber Pakhtunkhwa",Protests,"Peaceful protest",1,0,"40,079",Demonstrations,33.993,71.672
+2026-08-15,"South Asia",Pakistan,"Khyber Pakhtunkhwa","Violence against civilians","Abduction/forced disappearance",1,0,"43,136","Political violence",33.993,71.672
+2026-08-15,"South Asia",Pakistan,"Khyber Pakhtunkhwa","Strategic developments","Change to group/activity",1,0,0,"Strategic developments",33.993,71.672
+2026-08-15,"South Asia",Pakistan,Punjab,"Violence against civilians",Attack,1,0,"275,978","Political violence",30.873,72.312
+2026-08-15,"South Asia",Pakistan,Punjab,Riots,"Violent demonstration",1,0,"227,446",Demonstrations,30.873,72.312
+2026-08-15,"South Asia",Pakistan,Punjab,Protests,"Peaceful protest",14,0,"193,172",Demonstrations,30.873,72.312
+2026-08-15,"South Asia",Pakistan,Punjab,Riots,"Mob violence",1,1,0,"Political violence",30.873,72.312
+2026-08-15,"South Asia",Pakistan,Sindh,Protests,"Peaceful protest",97,0,"2,483,695",Demonstrations,26.108,68.750
+2026-08-15,"South Asia",Pakistan,Sindh,Riots,"Mob violence",1,2,0,"Political violence",26.108,68.750
+2026-08-15,"South Asia",Pakistan,Sindh,"Strategic developments",Arrests,2,0,0,"Strategic developments",26.108,68.750
+2026-08-15,"South Asia",Pakistan,Sindh,"Violence against civilians","Abduction/forced disappearance",1,0,0,"Political violence",26.108,68.750
+2026-08-15,"South Asia",Pakistan,Sindh,Protests,"Protest with intervention",1,0,"123,383",Demonstrations,26.108,68.750
+2026-08-15,"South Asia",Pakistan,Sindh,"Explosions/Remote violence","Remote explosive/landmine/IED",1,0,"260,822","Political violence",26.108,68.750
+2026-08-15,"South Asia",Pakistan,Sindh,Riots,"Violent demonstration",1,0,"161,724",Demonstrations,26.108,68.750
+2026-08-15,"South Asia","Sri Lanka",Eastern,"Violence against civilians",Attack,1,0,0,"Political violence",7.753,81.461
+2026-08-15,"South Asia","Sri Lanka",Eastern,"Strategic developments","Disrupted weapons use",1,0,0,"Strategic developments",7.753,81.461
+2026-08-15,"South Asia","Sri Lanka",Eastern,Protests,"Peaceful protest",1,0,0,Demonstrations,7.753,81.461
+2026-08-15,"South Asia","Sri Lanka",Northern,Protests,"Peaceful protest",7,0,"16,720",Demonstrations,9.178,80.481
+2026-08-15,"South Asia","Sri Lanka",Western,"Strategic developments","Disrupted weapons use",1,0,0,"Strategic developments",6.828,80.033

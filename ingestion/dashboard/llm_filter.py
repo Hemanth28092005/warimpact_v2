@@ -65,10 +65,11 @@ INDIAN_STATES_GEO = [
 
 
 def resolve_event_location(
-    lat: float | None,
-    long_: float | None,
+    lat: float | None = None,
+    long_: float | None = None,
     url: str = "",
     headline: str = "",
+    article_text: str = "",
 ) -> tuple[str, str, str | None, str | None, str]:
     """Resolve granular geography hierarchy for an event.
 
@@ -76,7 +77,7 @@ def resolve_event_location(
         (location_name, location_level, city, state, country_code)
         where location_level in ('venue', 'city', 'district', 'state', 'national', 'unknown')
     """
-    text_combined = f"{url.lower()} {headline.lower()}"
+    text_combined = f"{url.lower()} {headline.lower()} {article_text.lower()}".strip()
 
     # 1. Venue-level check
     if "jantar mantar" in text_combined or "jantar-mantar" in text_combined:

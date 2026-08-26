@@ -1,8 +1,11 @@
 """Celery application configuration for ingestion and model automation."""
 
-from __future__ import annotations
-
+import sys
+import asyncio
 from celery import Celery  # type: ignore[import-untyped]
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from ingestion.common.beat_schedule import BEAT_SCHEDULE
 from ingestion.common.config import get_settings
@@ -16,6 +19,8 @@ celery_app = Celery(
     include=[
         "ingestion.gdelt.tasks",
         "ingestion.dashboard.tasks",
+        "ingestion.geo.tasks",
+        "ingestion.markets.tasks",
         "models.sentiment.tasks",
         "models.cii.tasks",
         "models.aggression.tasks",

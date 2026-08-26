@@ -47,16 +47,20 @@ class ProtestResponse(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     id: int = Field(..., description="Unique protest record identifier")
-    city: str = Field(..., description="City or region name of protest/demonstration")
+    city: Optional[str] = Field(None, description="City or region name of protest/demonstration")
+    location_name: Optional[str] = Field(None, description="Granular venue or place name")
+    location_level: Optional[str] = Field(None, description="Location precision level ('venue', 'city', 'district', 'state', 'national')")
+    state: Optional[str] = Field(None, description="State or province name")
+    country_code: Optional[str] = Field(None, description="ISO3 country code (e.g. IND)")
     event_date: str = Field(..., description="Event date (YYYY-MM-DD)")
     headline: str = Field(..., description="Extracted news headline or event description")
     action_geo_lat: Optional[float] = Field(None, description="Latitude of event")
     action_geo_long: Optional[float] = Field(None, description="Longitude of event")
     gdelt_event_id: Optional[int] = Field(None, description="GDELT global event ID reference")
     source_url: Optional[str] = Field(None, description="Source article URL")
-    event_severity: float = Field(..., description="Event severity score derived from Goldstein scale")
+    event_severity: float = Field(..., description="Event severity score [0.0, 100.0]")
     llm_brief: Optional[str] = Field(None, description="LLM-generated 1-2 sentence neutral summary brief")
-    validation_source: Optional[str] = Field(None, description="Validation source ('groq', 'gemini', 'rules')")
+    validation_source: Optional[str] = Field(None, description="Validation source ('groq', 'gemini', 'rules', 'acled')")
     updated_at: str = Field(..., description="ISO timestamp of record update")
 
 
@@ -211,21 +215,35 @@ async def get_trade_routes(
 @router.get("/protests", response_model=list[ProtestResponse])
 async def get_protests(
     limit: int = Query(default=50, ge=1, le=200, description="Maximum protest events to return"),
+    validation_source: Optional[str] = Query(None, description="Filter by validation source (e.g. 'acled', 'rules', 'groq')"),
+    country_code: Optional[str] = Query(None, description="Filter by ISO3 country code (e.g. 'IND', 'PAK', 'BGD')"),
 ) -> list[dict[str, Any]]:
-    """Retrieve recent civil unrest and protest demonstrations (filtered for non-violent CAMEO 14x codes)."""
+    """Retrieve recent civil unrest and protest demonstrations, prioritizing ACLED validated records."""
+    query = """
+        SELECT id, city, location_name, location_level, state, country_code,
+               event_date, headline, action_geo_lat, action_geo_long,
+               gdelt_event_id, source_url, event_severity, llm_brief,
+               validation_source, updated_at
+        FROM protests
+        WHERE 1=1
+    """
+    params: list[Any] = []
+    if validation_source:
+        query += " AND validation_source = %s"
+        params.append(validation_source.lower().strip())
+    if country_code:
+        query += " AND country_code = %s"
+        params.append(country_code.upper().strip())
+
+    query += """
+        ORDER BY CASE WHEN validation_source = 'acled' THEN 0 ELSE 1 END, event_date DESC, id DESC
+        LIMIT %s;
+    """
+    params.append(limit)
+
     async with open_async_connection() as conn:
         async with conn.cursor() as cur:
-            await cur.execute(
-                """
-                SELECT id, city, event_date, headline, action_geo_lat,
-                       action_geo_long, gdelt_event_id, source_url,
-                       event_severity, llm_brief, validation_source, updated_at
-                FROM protests
-                ORDER BY event_date DESC, id DESC
-                LIMIT %s;
-                """,
-                (limit,),
-            )
+            await cur.execute(query, tuple(params))
             rows = await cur.fetchall()
 
     results = []
@@ -234,16 +252,20 @@ async def get_protests(
             {
                 "id": int(r[0]),
                 "city": r[1],
-                "event_date": str(r[2]),
-                "headline": r[3],
-                "action_geo_lat": float(r[4]) if r[4] is not None else None,
-                "action_geo_long": float(r[5]) if r[5] is not None else None,
-                "gdelt_event_id": int(r[6]) if r[6] is not None else None,
-                "source_url": r[7],
-                "event_severity": float(r[8]),
-                "llm_brief": r[9],
-                "validation_source": r[10],
-                "updated_at": r[11].isoformat() if hasattr(r[11], "isoformat") else str(r[11]),
+                "location_name": r[2],
+                "location_level": r[3],
+                "state": r[4],
+                "country_code": r[5] or "IND",
+                "event_date": str(r[6]),
+                "headline": r[7],
+                "action_geo_lat": float(r[8]) if r[8] is not None else None,
+                "action_geo_long": float(r[9]) if r[9] is not None else None,
+                "gdelt_event_id": int(r[10]) if r[10] is not None else None,
+                "source_url": r[11],
+                "event_severity": float(r[12]),
+                "llm_brief": r[13],
+                "validation_source": r[14],
+                "updated_at": r[15].isoformat() if hasattr(r[15], "isoformat") else str(r[15]),
             }
         )
     return results

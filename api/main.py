@@ -6,11 +6,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes.aggression import router as aggression_router
+from api.routes.brief import router as brief_router
 from api.routes.cascade import cascade_router
 from api.routes.cii import router as cii_router
 from api.routes.dashboard import router as dashboard_router
+from api.routes.events import router as events_router
 from api.routes.health import router as health_router
 from api.routes.live_feed import router as live_feed_router
+from api.routes.markets import router as markets_router
 
 app = FastAPI(
     title="War Impact Platform API",
@@ -32,6 +35,9 @@ app.include_router(aggression_router)
 app.include_router(live_feed_router)
 app.include_router(cascade_router)
 app.include_router(dashboard_router)
+app.include_router(markets_router)
+app.include_router(events_router)
+app.include_router(brief_router)
 app.include_router(health_router)
 
 

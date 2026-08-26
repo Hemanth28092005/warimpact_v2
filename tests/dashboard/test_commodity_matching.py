@@ -21,7 +21,7 @@ def test_positive_commodity_matches():
 
     # 2. Natural Gas LNG
     is_m, conf, reason = match_commodity_candidate(
-        "NATURAL_GAS_LNG",
+        "LNG_NATURAL_GAS",
         headline="India Inks 10-Year LNG Import Contract with QatarEnergy",
         url="https://economictimes.com/industry/energy/lng-import-deal",
     )
@@ -30,16 +30,16 @@ def test_positive_commodity_matches():
 
     # 3. Gold
     is_m, conf, reason = match_commodity_candidate(
-        "GOLD_UNWROUGHT",
+        "GOLD",
         headline="India Gold Import Duty Cut Triggers Surge in Bullion Imports",
         url="https://business-standard.com/markets/gold-import-duty-surge",
     )
     assert is_m
     assert conf >= 0.80
 
-    # 4. Fertilizers Urea
+    # 4. Fertilizers
     is_m, conf, reason = match_commodity_candidate(
-        "FERTILIZERS_UREA",
+        "FERTILIZERS",
         headline="Government Approves Fresh Neem Coated Urea Import Subsidy Package",
         url="https://thehindubusinessline.com/agri-business/urea-subsidy-approval",
     )
@@ -59,7 +59,7 @@ def test_commodity_exclusion_rules():
 
     # Case 2: Celebrity gold jewelry theft
     is_m, conf, _ = match_commodity_candidate(
-        "GOLD_UNWROUGHT",
+        "GOLD",
         headline="Hollywood Actress Wins Golden Globe Award at Star-Studded Ceremony",
         url="https://variety.com/awards/golden-globe-winners",
     )
@@ -80,15 +80,15 @@ def test_energy_commodity_disambiguation():
 
     # Should not match coal without coal-specific keywords
     is_coal, _, _ = match_commodity_candidate(
-        "COAL_COKING",
+        "COAL_COKE",
         headline=generic_energy_story,
         url="https://bloomberg.com/energy/surge",
     )
-    assert not is_coal, "Generic energy story must not match coking coal without specific keywords."
+    assert not is_coal, "Generic energy story must not match coal without specific keywords."
 
     # Should not match LNG without LNG keywords
     is_lng, _, _ = match_commodity_candidate(
-        "NATURAL_GAS_LNG",
+        "LNG_NATURAL_GAS",
         headline=generic_energy_story,
         url="https://bloomberg.com/energy/surge",
     )

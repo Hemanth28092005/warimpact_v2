@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import sys
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from typing import Any
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from ingestion.common.db import open_async_connection
 from ingestion.common.logger import get_logger

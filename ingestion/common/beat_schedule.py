@@ -67,4 +67,28 @@ BEAT_SCHEDULE: dict[str, dict[str, Any]] = {
         "task": "models.trade_routes.tasks.run_trade_routes_pipeline",
         "schedule": timedelta(hours=24),
     },
+    "ingestion-run-commodity-prices": {
+        "task": "ingestion.markets.tasks.run_commodity_prices",
+        "schedule": timedelta(minutes=30),
+    },
+    "ingestion-run-freight-indices": {
+        "task": "ingestion.markets.tasks.run_freight_indices",
+        "schedule": timedelta(hours=12),
+    },
+    "ingestion-run-seismic-events": {
+        "task": "ingestion.geo.tasks.run_seismic_events",
+        "schedule": timedelta(minutes=15),
+    },
+    "ingestion-run-military-flights": {
+        "task": "ingestion.geo.tasks.run_military_flights",
+        "schedule": timedelta(minutes=5),
+    },
+    "ingestion-run-intel-seed": {
+        "task": "ingestion.geo.tasks.run_intel_seed",
+        "schedule": crontab(hour="4", minute="0"),
+    },
+    "ingestion-run-prediction-markets": {
+        "task": "ingestion.markets.tasks.run_prediction_markets",
+        "schedule": timedelta(hours=1),
+    },
 }

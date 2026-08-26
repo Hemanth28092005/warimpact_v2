@@ -18,6 +18,10 @@ class Settings:
     celery_broker_url: str
     celery_result_backend: str
     log_level: str
+    acled_email: str | None = None
+    acled_access_key: str | None = None
+    eia_api_key: str | None = None
+    datagovin_api_key: str | None = None
 
     @property
     def psycopg_database_url(self) -> str:
@@ -39,6 +43,10 @@ def get_settings() -> Settings:
         celery_broker_url=os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0"),
         celery_result_backend=os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/1"),
         log_level=os.getenv("LOG_LEVEL", "INFO"),
+        acled_email=os.getenv("ACLED_EMAIL"),
+        acled_access_key=os.getenv("ACLED_ACCESS_KEY"),
+        eia_api_key=os.getenv("EIA_API_KEY"),
+        datagovin_api_key=os.getenv("DATAGOVIN_API_KEY"),
     )
 
 

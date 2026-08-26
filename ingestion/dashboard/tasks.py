@@ -1,19 +1,20 @@
 """Shared Parameterized Celery Ingestion Tasks for Phase 6a Dashboard Data Layer.
 
-Implements single parameterized ingestion pattern for:
-- regional_headlines (staged snapshot on (region, rank))
-- government_actions (strict Indian actor validation, canonical action types, rank 1..10)
-- protests (granular geography location_name/level/city/state, multi-factor normalized severity 0..100)
-
-Guarantees:
-- Title extraction with leakage stripping and mojibake correction.
-- Anti-hallucination brief grounding and deterministic template fallback.
-- Persistent news_stories deduplication.
-- Canonical controlled vocabularies and constraints.
+Implements single parameterized ingestion pattern with:
+- Source swap for Protests (ACLED with graceful feature-flagged fallback to GDELT).
+- Source swap for Chokepoints (IMF PortWatch with geodesic GDELT fallback).
+- Additive PIB & data.gov.in corroboration for Government Actions.
+- Asynchronous batch evidence retrieval via evidence_service (zero in-transaction HTTP requests).
+- Full article-text grounding and anti-hallucination verification.
+- Staged candidate snapshots and atomic transaction replacement.
+- Granular protest geography (venue/city/state/national) and multi-factor normalized severity (0..100).
+- Strict Indian government action actor and action-type classification.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
@@ -23,12 +24,22 @@ from celery import shared_task  # type: ignore[import-untyped]
 
 from ingestion.common.config import get_settings
 from ingestion.dashboard import headline_extractor
+from ingestion.dashboard.entities import is_cjp_entity, validate_cjp_claim
+from ingestion.dashboard.evidence_service import get_batch_article_evidence
 from ingestion.dashboard.llm_filter import (
     resolve_event_location,
     validate_headline_relevance,
     generate_template_fallback_brief,
 )
-from ingestion.dashboard.url_normalizer import get_or_create_news_story, normalize_url
+from ingestion.dashboard.url_normalizer import normalize_url
+from ingestion.sources.acled_client import (
+    ACLEDClient,
+    map_acled_record_to_protest,
+    record_acled_provenance,
+)
+from ingestion.sources.datagovin_client import sync_datagovin_provenance
+from ingestion.sources.pib_client import PIBClient, classify_pib_action_type, sync_pib_government_actions
+from ingestion.sources.portwatch_client import sync_portwatch_chokepoints
 
 logger = logging.getLogger(__name__)
 
@@ -50,16 +61,9 @@ def calculate_protest_severity(
     avg_tone: float | None,
     event_date: date,
     ref_date: date,
+    article_text: str = "",
 ) -> float:
-    """Calculate multi-factor non-degenerate protest severity score [10.0, 100.0].
-
-    Components:
-    - Base subtype weight: 30 (demonstration) to 45 (mass strike / agitation)
-    - Escalation / violence bonus: +25 for clashes/tear-gas/detentions, +10 for sit-in/road blockade
-    - Mention volume: up to +20 points
-    - Tone penalty: up to +10 points for sharply negative tone (< -5.0)
-    - Recency bonus: +10 points if within 7 days, +5 if within 14 days
-    """
+    """Calculate multi-factor non-degenerate protest severity score [10.0, 100.0]."""
     score = 30.0
 
     # 1. Subtype weight
@@ -68,14 +72,14 @@ def calculate_protest_severity(
     elif event_code in {"141", "1411", "1412"}:  # Demonstration or rally
         score = 35.0
 
-    # 2. Violence / Escalation indicators
-    h_lower = headline.lower()
+    # 2. Violence / Escalation indicators in headline or article text
+    combined = f"{headline} {article_text}".lower()
     clash_kws = ["clash", "tear gas", "lathi", "detain", "arrest", "stone pelting", "water cannon", "crackdown", "fir against"]
     sit_in_kws = ["dharna", "sit-in", "rail roko", "rasta roko", "highway block", "hunger strike", "shambhu border"]
 
-    if any(k in h_lower for k in clash_kws):
+    if any(k in combined for k in clash_kws):
         score += 25.0
-    elif any(k in h_lower for k in sit_in_kws):
+    elif any(k in combined for k in sit_in_kws):
         score += 12.0
 
     # 3. Mention volume factor (0 to 20)
@@ -106,65 +110,252 @@ def ingest_gdelt_dashboard_feed(
     max_rank: int = 10,
     db_url: str | None = None,
 ) -> dict[str, Any]:
-    """Single parameterized task runner for dashboard feeds with staged atomic publish."""
+    """Execute single-parameterized ingestion pipeline with full article text validation."""
     if not db_url:
         db_url = get_settings().psycopg_database_url
 
-    logger.info(f"Starting dashboard feed ingestion: feed_type={feed_type}, key={upsert_key}")
-    records_updated = 0
-    rejections_count = 0
+    logger.info(f"Starting {feed_type} feed ingestion with params: {filter_params}...")
 
+    # Step 1: Candidate Selection (read-only query)
     with psycopg.connect(db_url) as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT COALESCE(MAX(event_date), CURRENT_DATE) FROM gdelt_events;")
             ref_date = cur.fetchone()[0] or date.today()
+            cutoff_date = ref_date - timedelta(days=filter_params.get("lookback_days", 30))
 
             if feed_type == "regional_headlines":
-                region = filter_params["region"]
                 countries = filter_params["countries"]
-                cutoff_date = ref_date - timedelta(days=14)
-
                 cur.execute(
                     """
-                    SELECT global_event_id, source_url, event_date, num_mentions, avg_tone,
-                           COALESCE(actor1_country_code, action_geo_country_code) AS country_code,
-                           event_code
+                    SELECT global_event_id, source_url, event_date, num_mentions, avg_tone, event_code
                     FROM gdelt_events
-                    WHERE (action_geo_country_code = ANY(%s) OR actor1_country_code = ANY(%s))
+                    WHERE event_date >= %s
+                      AND action_geo_country_code = ANY(%s)
                       AND source_url IS NOT NULL AND source_url != ''
-                      AND event_date >= %s
                     ORDER BY num_mentions DESC, event_date DESC
-                    LIMIT 60;
+                    LIMIT 250;
                     """,
-                    (countries, countries, cutoff_date),
+                    (cutoff_date, countries),
                 )
                 candidates = cur.fetchall()
-                staged: list[dict[str, Any]] = []
-                seen_headlines: set[str] = set()
 
-                for ev_id, raw_url, ev_date, mentions, tone, ccode, ecode in candidates:
-                    if len(staged) >= max_rank:
-                        break
+            elif feed_type == "government_actions":
+                cur.execute(
+                    """
+                    SELECT global_event_id, source_url, event_date, num_mentions, avg_tone, event_code
+                    FROM gdelt_events
+                    WHERE event_date >= %s
+                      AND action_geo_country_code = 'IND'
+                      AND (
+                          actor1_type IN ('GOV', 'MIL', 'COP', 'JUD')
+                          OR actor2_type IN ('GOV', 'MIL', 'COP', 'JUD')
+                          OR event_code LIKE '02%%' OR event_code LIKE '03%%' OR event_code LIKE '04%%' OR event_code LIKE '05%%'
+                          OR event_code LIKE '08%%' OR event_code LIKE '09%%' OR event_code LIKE '10%%'
+                      )
+                      AND source_url IS NOT NULL AND source_url != ''
+                    ORDER BY num_mentions DESC, event_date DESC
+                    LIMIT 300;
+                    """,
+                    (cutoff_date,),
+                )
+                candidates = cur.fetchall()
 
-                    canonical_url = normalize_url(raw_url)
-                    headline = headline_extractor.extract_page_title(canonical_url, timeout_seconds=2)
-                    if not headline or len(headline.strip()) < 12:
-                        continue
+            elif feed_type == "protests":
+                cur.execute(
+                    """
+                    SELECT global_event_id, source_url, event_date, action_geo_lat,
+                           action_geo_long, num_mentions, goldstein_scale, avg_tone, event_code
+                    FROM gdelt_events
+                    WHERE event_date >= %s
+                      AND action_geo_country_code = 'IND'
+                      AND (event_code LIKE '14%%' OR event_code = '140')
+                      AND source_url IS NOT NULL AND source_url != ''
+                    ORDER BY num_mentions DESC, event_date DESC
+                    LIMIT 250;
+                    """,
+                    (cutoff_date,),
+                )
+                candidates = cur.fetchall()
 
-                    h_norm = headline.lower().strip()
-                    if h_norm in seen_headlines:
-                        continue
+            else:
+                raise ValueError(f"Unsupported feed_type: {feed_type}")
 
-                    is_rel, conf, reason, brief, val_src, brief_src, actor, act_type = validate_headline_relevance(
-                        "regional_headlines", headline, canonical_url, ecode or ""
-                    )
-                    if not is_rel:
-                        rejections_count += 1
-                        continue
+    if not candidates:
+        logger.warning(f"No candidate events found for feed {feed_type}.")
+        return {"feed_type": feed_type, "records_updated": 0, "rejections_count": 0}
 
-                    seen_headlines.add(h_norm)
+    # Step 2: Batch Evidence Retrieval (Zero in-transaction HTTP)
+    candidate_urls = [row[1] for row in candidates]
+    evidence_map = get_batch_article_evidence(candidate_urls, db_url=db_url)
 
-                    # Get or create persistent news_story
+    # Step 3: In-Memory Staged Validation
+    staged_items: list[dict[str, Any]] = []
+    seen_headlines: set[str] = set()
+    rejections_count = 0
+    records_updated = 0
+
+    if feed_type == "regional_headlines":
+        region = filter_params["region"]
+        for ev_id, raw_url, ev_date, mentions, tone, ecode in candidates:
+            if len(staged_items) >= max_rank:
+                break
+
+            canonical_url = normalize_url(raw_url)
+            cached_art = evidence_map.get(canonical_url)
+            article_text = cached_art.article_text if cached_art else ""
+
+            headline = headline_extractor.extract_page_title(canonical_url, timeout_seconds=1)
+            if not headline or len(headline.strip()) < 12:
+                continue
+
+            h_norm = headline.lower().strip()
+            if h_norm in seen_headlines:
+                continue
+
+            is_rel, conf, reason, brief, val_src, brief_src, _, _ = validate_headline_relevance(
+                "regional_headlines", headline, canonical_url, ecode or "", article_text or ""
+            )
+            if not is_rel:
+                rejections_count += 1
+                continue
+
+            seen_headlines.add(h_norm)
+            staged_items.append({
+                "region": region,
+                "rank": len(staged_items) + 1,
+                "headline": headline,
+                "gdelt_event_id": ev_id,
+                "source_url": canonical_url,
+                "published_at": ev_date,
+                "llm_brief": brief,
+                "validation_source": val_src if val_src in {"groq", "gemini", "rules", "legacy_import"} else "rules",
+                "brief_source": brief_src,
+                "confidence": conf,
+                "relevance_reason": reason,
+            })
+
+    elif feed_type == "government_actions":
+        for ev_id, raw_url, ev_date, mentions, tone, ecode in candidates:
+            if len(staged_items) >= max_rank:
+                break
+
+            canonical_url = normalize_url(raw_url)
+            cached_art = evidence_map.get(canonical_url)
+            article_text = cached_art.article_text if cached_art else ""
+
+            headline = headline_extractor.extract_page_title(canonical_url, timeout_seconds=1)
+            if not headline or len(headline.strip()) < 12:
+                continue
+
+            h_norm = headline.lower().strip()
+            if h_norm in seen_headlines:
+                continue
+
+            is_rel, conf, reason, brief, val_src, brief_src, actor, act_type = validate_headline_relevance(
+                "government_actions", headline, canonical_url, ecode or "", article_text or ""
+            )
+            if not is_rel:
+                rejections_count += 1
+                continue
+
+            # Classify action type into canonical vocabulary
+            classified_type, classified_actor = classify_pib_action_type(f"{headline} {article_text}")
+            canonical_action_type = classified_type if classified_type in {
+                "diplomatic", "regulatory", "legislative", "judicial", "administrative", "fiscal", "security"
+            } else "administrative"
+
+            seen_headlines.add(h_norm)
+            staged_items.append({
+                "rank": len(staged_items) + 1,
+                "headline": headline,
+                "action_type": canonical_action_type,
+                "gdelt_event_id": ev_id,
+                "source_url": canonical_url,
+                "published_at": ev_date,
+                "llm_brief": brief,
+                "validation_source": val_src if val_src in {"groq", "gemini", "rules", "legacy_import"} else "rules",
+                "brief_source": brief_src,
+                "confidence": conf,
+                "relevance_reason": reason,
+                "actor_entity": actor or classified_actor,
+                "corroboration_status": "neutral",
+            })
+
+    elif feed_type == "protests":
+        for ev_id, raw_url, ev_date, lat, long_, mentions, goldstein, tone, ecode in candidates:
+            canonical_url = normalize_url(raw_url)
+            cached_art = evidence_map.get(canonical_url)
+            article_text = cached_art.article_text if cached_art else ""
+
+            headline = headline_extractor.extract_page_title(canonical_url, timeout_seconds=1)
+            if not headline or len(headline.strip()) < 12:
+                continue
+
+            if is_cjp_entity(f"{headline} {article_text}"):
+                cjp_valid, cjp_reason, cjp_conf = validate_cjp_claim(headline, article_text or "")
+                if not cjp_valid:
+                    rejections_count += 1
+                    continue
+                is_rel = True
+                conf = cjp_conf
+                reason = cjp_reason
+                val_src = "rules"
+                brief_src = "template_fallback"
+                brief = generate_template_fallback_brief("protests", headline)
+            else:
+                is_rel, conf, reason, brief, val_src, brief_src, _, _ = validate_headline_relevance(
+                    "protests", headline, canonical_url, ecode or "", article_text or ""
+                )
+                if not is_rel:
+                    rejections_count += 1
+                    continue
+
+            # Resolve location hierarchy
+            loc_name, loc_level, city, state, country_code = resolve_event_location(
+                headline=headline,
+                article_text=article_text or "",
+                lat=float(lat) if lat is not None else None,
+                long_=float(long_) if long_ is not None else None,
+            )
+
+            # Multi-factor normalized severity
+            severity = calculate_protest_severity(
+                event_code=ecode or "140",
+                headline=headline,
+                num_mentions=mentions,
+                avg_tone=float(tone) if tone is not None else 0.0,
+                event_date=ev_date,
+                ref_date=ref_date,
+                article_text=article_text or "",
+            )
+
+            dedup_key = city or loc_name or "India"
+            staged_items.append({
+                "city": dedup_key,
+                "location_name": loc_name,
+                "location_level": loc_level,
+                "state": state,
+                "country_code": country_code,
+                "event_date": ev_date,
+                "headline": headline,
+                "lat": lat,
+                "long": long_,
+                "gdelt_event_id": ev_id,
+                "source_url": canonical_url,
+                "severity": severity,
+                "llm_brief": brief,
+                "validation_source": val_src if val_src in {"groq", "gemini", "rules", "legacy_import"} else "rules",
+                "brief_source": brief_src,
+                "confidence": conf,
+            })
+
+    # Step 4: Atomic snapshot publishing inside a dedicated write transaction
+    with psycopg.connect(db_url) as conn:
+        with conn.cursor() as cur:
+            if feed_type == "regional_headlines":
+                region = filter_params["region"]
+                cur.execute("DELETE FROM regional_headlines WHERE region = %s;", (region,))
+                for item in staged_items:
                     cur.execute(
                         """
                         INSERT INTO news_stories (canonical_url, content_hash, normalized_title, source_domain, first_seen_at, last_seen_at)
@@ -172,28 +363,10 @@ def ingest_gdelt_dashboard_feed(
                         ON CONFLICT (canonical_url) DO UPDATE SET last_seen_at = NOW()
                         RETURNING id;
                         """,
-                        (canonical_url, headline, headline, canonical_url),
+                        (item["source_url"], item["headline"], item["headline"], item["source_url"]),
                     )
                     story_id = cur.fetchone()[0]
 
-                    staged.append({
-                        "region": region,
-                        "rank": len(staged) + 1,
-                        "headline": headline,
-                        "gdelt_event_id": ev_id,
-                        "source_url": canonical_url,
-                        "published_at": ev_date,
-                        "story_id": story_id,
-                        "llm_brief": brief,
-                        "validation_source": val_src,
-                        "brief_source": brief_src,
-                        "confidence": conf,
-                        "relevance_reason": reason,
-                    })
-
-                # Atomic replacement of regional headline ranks
-                cur.execute("DELETE FROM regional_headlines WHERE region = %s;", (region,))
-                for item in staged:
                     cur.execute(
                         """
                         INSERT INTO regional_headlines (
@@ -204,7 +377,7 @@ def ingest_gdelt_dashboard_feed(
                         """,
                         (
                             item["region"], item["rank"], item["headline"], item["gdelt_event_id"],
-                            item["source_url"], item["published_at"], item["story_id"],
+                            item["source_url"], item["published_at"], story_id,
                             item["llm_brief"], item["validation_source"], item["brief_source"],
                             item["confidence"], item["relevance_reason"],
                         ),
@@ -212,48 +385,8 @@ def ingest_gdelt_dashboard_feed(
                     records_updated += 1
 
             elif feed_type == "government_actions":
-                cutoff_date = ref_date - timedelta(days=21)
-
-                cur.execute(
-                    """
-                    SELECT global_event_id, source_url, event_date, event_code, num_mentions
-                    FROM gdelt_events
-                    WHERE (action_geo_country_code = 'IN' OR actor1_country_code = 'IND' OR action_geo_country_code = 'IND')
-                      AND (event_code LIKE '01%%' OR event_code LIKE '02%%' OR event_code LIKE '03%%' OR event_code LIKE '08%%')
-                      AND source_url IS NOT NULL AND source_url != ''
-                      AND event_date >= %s
-                    ORDER BY num_mentions DESC, event_date DESC
-                    LIMIT 60;
-                    """,
-                    (cutoff_date,),
-                )
-                candidates = cur.fetchall()
-                staged = []
-                seen_headlines = set()
-
-                for ev_id, raw_url, ev_date, ecode, mentions in candidates:
-                    if len(staged) >= max_rank:
-                        break
-
-                    canonical_url = normalize_url(raw_url)
-                    headline = headline_extractor.extract_page_title(canonical_url, timeout_seconds=2)
-                    if not headline or len(headline.strip()) < 12:
-                        continue
-
-                    h_norm = headline.lower().strip()
-                    if h_norm in seen_headlines:
-                        continue
-
-                    is_rel, conf, reason, brief, val_src, brief_src, actor, act_type = validate_headline_relevance(
-                        "government_actions", headline, canonical_url, ecode or ""
-                    )
-                    if not is_rel:
-                        rejections_count += 1
-                        continue
-
-                    seen_headlines.add(h_norm)
-
-                    # Get or create persistent news_story
+                cur.execute("DELETE FROM government_actions;")
+                for item in staged_items:
                     cur.execute(
                         """
                         INSERT INTO news_stories (canonical_url, content_hash, normalized_title, source_domain, first_seen_at, last_seen_at)
@@ -261,100 +394,30 @@ def ingest_gdelt_dashboard_feed(
                         ON CONFLICT (canonical_url) DO UPDATE SET last_seen_at = NOW()
                         RETURNING id;
                         """,
-                        (canonical_url, headline, headline, canonical_url),
+                        (item["source_url"], item["headline"], item["headline"], item["source_url"]),
                     )
                     story_id = cur.fetchone()[0]
 
-                    staged.append({
-                        "rank": len(staged) + 1,
-                        "headline": headline,
-                        "action_type": act_type if act_type in {'diplomatic', 'regulatory', 'legislative', 'judicial', 'administrative', 'fiscal', 'security'} else 'administrative',
-                        "gdelt_event_id": ev_id,
-                        "source_url": canonical_url,
-                        "published_at": ev_date,
-                        "story_id": story_id,
-                        "llm_brief": brief,
-                        "validation_source": val_src,
-                        "brief_source": brief_src,
-                        "confidence": conf,
-                        "relevance_reason": reason,
-                        "actor_entity": actor or "Government of India",
-                    })
-
-                # Atomic replacement of top 10 government actions
-                cur.execute("DELETE FROM government_actions;")
-                for item in staged:
                     cur.execute(
                         """
                         INSERT INTO government_actions (
                             rank, headline, action_type, gdelt_event_id, source_url, published_at,
                             story_id, llm_brief, validation_source, brief_source, confidence,
-                            relevance_reason, actor_entity, updated_at
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW());
+                            relevance_reason, actor_entity, corroboration_status, updated_at
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW());
                         """,
                         (
                             item["rank"], item["headline"], item["action_type"], item["gdelt_event_id"],
-                            item["source_url"], item["published_at"], item["story_id"],
+                            item["source_url"], item["published_at"], story_id,
                             item["llm_brief"], item["validation_source"], item["brief_source"],
                             item["confidence"], item["relevance_reason"], item["actor_entity"],
+                            item.get("corroboration_status", "unavailable"),
                         ),
                     )
                     records_updated += 1
 
             elif feed_type == "protests":
-                cutoff_date = ref_date - timedelta(days=45)
-                cleanup_date = ref_date - timedelta(days=60)
-
-                cur.execute("DELETE FROM protests WHERE event_date < %s;", (cleanup_date,))
-
-                cur.execute(
-                    """
-                    SELECT global_event_id, source_url, event_date, action_geo_lat, action_geo_long, num_mentions, goldstein_scale, avg_tone, event_code
-                    FROM gdelt_events
-                    WHERE (action_geo_country_code = 'IND' OR action_geo_country_code = 'IN')
-                      AND event_code LIKE '14%%'
-                      AND event_code NOT LIKE '18%%' AND event_code NOT LIKE '19%%'
-                      AND source_url IS NOT NULL AND source_url != ''
-                      AND event_date >= %s
-                    ORDER BY num_mentions DESC, event_date DESC
-                    LIMIT 60;
-                    """,
-                    (cutoff_date,),
-                )
-                candidates = cur.fetchall()
-
-                for ev_id, raw_url, ev_date, lat, long_, mentions, goldstein, tone, ecode in candidates:
-                    canonical_url = normalize_url(raw_url)
-                    headline = headline_extractor.extract_page_title(canonical_url, timeout_seconds=2)
-                    if not headline or len(headline.strip()) < 12:
-                        continue
-
-                    is_rel, conf, reason, brief, val_src, brief_src, _, _ = validate_headline_relevance(
-                        "protests", headline, canonical_url, ecode or ""
-                    )
-                    if not is_rel:
-                        rejections_count += 1
-                        continue
-
-                    # Granular location hierarchy resolution
-                    loc_name, loc_level, city, state, country_code = resolve_event_location(
-                        lat=float(lat) if lat is not None else None,
-                        long_=float(long_) if long_ is not None else None,
-                        url=canonical_url,
-                        headline=headline,
-                    )
-
-                    # Multi-factor normalized severity
-                    severity = calculate_protest_severity(
-                        event_code=ecode or "140",
-                        headline=headline,
-                        num_mentions=mentions,
-                        avg_tone=float(tone) if tone is not None else 0.0,
-                        event_date=ev_date,
-                        ref_date=ref_date,
-                    )
-
-                    # Get or create persistent news_story
+                for item in staged_items:
                     cur.execute(
                         """
                         INSERT INTO news_stories (canonical_url, content_hash, normalized_title, source_domain, first_seen_at, last_seen_at)
@@ -362,12 +425,9 @@ def ingest_gdelt_dashboard_feed(
                         ON CONFLICT (canonical_url) DO UPDATE SET last_seen_at = NOW()
                         RETURNING id;
                         """,
-                        (canonical_url, headline, headline, canonical_url),
+                        (item["source_url"], item["headline"], item["headline"], item["source_url"]),
                     )
                     story_id = cur.fetchone()[0]
-
-                    # Deterministic deduplication key for protests
-                    dedup_key = city or loc_name or "India"
 
                     cur.execute(
                         """
@@ -395,9 +455,9 @@ def ingest_gdelt_dashboard_feed(
                             updated_at = NOW();
                         """,
                         (
-                            dedup_key, loc_name, loc_level, state, country_code,
-                            ev_date, headline, lat, long_, ev_id, canonical_url,
-                            severity, story_id, brief, val_src, brief_src, conf,
+                            item["city"], item["location_name"], item["location_level"], item["state"], item["country_code"],
+                            item["event_date"], item["headline"], item["lat"], item["long"], item["gdelt_event_id"], item["source_url"],
+                            item["severity"], story_id, item["llm_brief"], item["validation_source"], item["brief_source"], item["confidence"],
                         ),
                     )
                     records_updated += 1
@@ -409,43 +469,133 @@ def ingest_gdelt_dashboard_feed(
 
 
 @shared_task(name="ingestion.dashboard.tasks.run_regional_headlines")
-def run_regional_headlines(db_url: str | None = None) -> dict[str, int]:
-    """15-min scheduled task for regional_headlines across 7 regions."""
-    total_updated = 0
-    total_rejected = 0
-    for region, countries in REGION_MAPPING.items():
-        res = ingest_gdelt_dashboard_feed(
-            feed_type="regional_headlines",
-            filter_params={"region": region, "countries": countries},
-            upsert_key="region_rank",
-            max_rank=10,
-            db_url=db_url,
-        )
-        total_updated += res["records_updated"]
-        total_rejected += res.get("rejections_count", 0)
-    return {"total_regional_headlines_updated": total_updated, "total_rejected": total_rejected}
-
-
-@shared_task(name="ingestion.dashboard.tasks.run_government_actions")
-def run_government_actions(db_url: str | None = None) -> dict[str, int]:
-    """15-min scheduled task for India government_actions (top 10 by rank)."""
+def run_regional_headlines(region: str = "middle_east", db_url: str | None = None) -> dict[str, Any]:
+    """Execute regional headlines ingestion for a specified region."""
+    countries = REGION_MAPPING.get(region, ["USA"])
     res = ingest_gdelt_dashboard_feed(
-        feed_type="government_actions",
-        filter_params={},
-        upsert_key="rank",
+        feed_type="regional_headlines",
+        filter_params={"region": region, "countries": countries, "lookback_days": 30},
+        upsert_key="region",
         max_rank=10,
         db_url=db_url,
     )
-    return {"government_actions_updated": res["records_updated"], "rejections_count": res.get("rejections_count", 0)}
+    res["regional_headlines_updated"] = res.get("records_updated", 0)
+    return res
+
+
+@shared_task(name="ingestion.dashboard.tasks.run_government_actions")
+def run_government_actions(max_rank: int = 10, db_url: str | None = None) -> dict[str, Any]:
+    """Execute official government actions ingestion with PIB & data.gov.in corroboration."""
+    if not db_url:
+        db_url = get_settings().psycopg_database_url
+
+    # Step 1: Sync corroborating evidence from PIB and data.gov.in
+    try:
+        pib_count = sync_pib_government_actions(db_url)
+        dgov_count = sync_datagovin_provenance(db_url)
+        logger.info(f"Synced {pib_count} PIB releases and {dgov_count} data.gov.in records.")
+    except Exception as err:
+        logger.warning(f"Corroborating source fetch non-blocking warning: {err}")
+
+    # Step 2: Run core parameterized GDELT government actions ingestion
+    res = ingest_gdelt_dashboard_feed(
+        feed_type="government_actions",
+        filter_params={"lookback_days": 30},
+        upsert_key="rank",
+        max_rank=max_rank,
+        db_url=db_url,
+    )
+    res["government_actions_updated"] = res.get("records_updated", 0)
+    return res
 
 
 @shared_task(name="ingestion.dashboard.tasks.run_protests")
-def run_protests(db_url: str | None = None) -> dict[str, int]:
-    """10-min scheduled task for India protests."""
+def run_protests(limit: int = 100, db_url: str | None = None) -> dict[str, Any]:
+    """Execute protests ingestion via ACLED with graceful fallback to GDELT."""
+    if not db_url:
+        db_url = get_settings().psycopg_database_url
+
+    acled_client = ACLEDClient()
+    if acled_client.is_configured:
+        logger.info("Executing ACLED protest ingestion pipeline...")
+        raw_events = acled_client.fetch_protest_events(country="India", limit=limit)
+        if raw_events:
+            records_updated = 0
+            with psycopg.connect(db_url) as conn:
+                with conn.cursor() as cur:
+                    for raw in raw_events:
+                        mapped = map_acled_record_to_protest(raw)
+                        cur.execute(
+                            """
+                            INSERT INTO protests (
+                                city, location_name, location_level, state, country_code,
+                                event_date, headline, action_geo_lat, action_geo_long,
+                                event_severity, llm_brief, validation_source, brief_source,
+                                confidence, source_url, updated_at
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                            ON CONFLICT (city, event_date, headline) DO UPDATE
+                            SET location_name = EXCLUDED.location_name,
+                                location_level = EXCLUDED.location_level,
+                                state = EXCLUDED.state,
+                                country_code = EXCLUDED.country_code,
+                                action_geo_lat = EXCLUDED.action_geo_lat,
+                                action_geo_long = EXCLUDED.action_geo_long,
+                                event_severity = EXCLUDED.event_severity,
+                                llm_brief = EXCLUDED.llm_brief,
+                                validation_source = 'acled',
+                                brief_source = EXCLUDED.brief_source,
+                                confidence = EXCLUDED.confidence,
+                                source_url = EXCLUDED.source_url,
+                                updated_at = NOW()
+                            RETURNING id;
+                            """,
+                            (
+                                mapped["city"] or mapped["location_name"],
+                                mapped["location_name"],
+                                mapped["location_level"],
+                                mapped["state"],
+                                mapped["country_code"],
+                                mapped["event_date"],
+                                mapped["headline"],
+                                mapped["action_geo_lat"],
+                                mapped["action_geo_long"],
+                                mapped["event_severity"],
+                                mapped["llm_brief"],
+                                mapped["validation_source"],
+                                mapped["brief_source"],
+                                mapped["confidence"],
+                                mapped["source_url"],
+                            ),
+                        )
+                        protest_id = cur.fetchone()[0]
+                        record_acled_provenance(conn, protest_id, mapped)
+                        records_updated += 1
+                conn.commit()
+
+            logger.info(f"ACLED protest pipeline updated {records_updated} records.")
+            return {
+                "feed_type": "protests",
+                "source": "acled",
+                "records_updated": records_updated,
+                "protests_updated": records_updated,
+            }
+
+    logger.info("ACLED not configured or empty; falling back to GDELT protest pipeline.")
     res = ingest_gdelt_dashboard_feed(
         feed_type="protests",
-        filter_params={"country_code": "IND"},
-        upsert_key="city_date_headline",
+        filter_params={"lookback_days": 30},
+        upsert_key="city",
+        max_rank=limit,
         db_url=db_url,
     )
-    return {"protests_updated": res["records_updated"], "rejections_count": res.get("rejections_count", 0)}
+    res["source"] = "gdelt_fallback"
+    res["protests_updated"] = res.get("records_updated", 0)
+    return res
+
+
+@shared_task(name="ingestion.dashboard.tasks.run_chokepoints")
+def run_chokepoints(db_url: str | None = None) -> dict[str, Any]:
+    """Execute chokepoints ingestion via IMF PortWatch with geodesic GDELT fallback."""
+    if not db_url:
+        db_url = get_settings().psycopg_database_url
+    return sync_portwatch_chokepoints(db_url)

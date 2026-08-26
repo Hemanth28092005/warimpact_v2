@@ -19,14 +19,15 @@ logger = get_logger(__name__)
 def run_cascade_analysis(self: Any, window_days: int = 7, k: float = 2.0) -> dict[str, Any]:
     """Celery task executing daily cascade contagion analysis."""
     import asyncio
-    from models.cascade.worker import run_cascade_worker
+    from models.cascade.worker import run_cascade_pipeline
 
     logger.info("celery_cascade_task_started", extra={"window_days": window_days, "k": k})
-    rows_saved = asyncio.run(run_cascade_worker(window_days=window_days, k=k))
+    execution = asyncio.run(run_cascade_pipeline(window_days=window_days, k=k))
 
     return {
         "status": "success",
-        "rows_saved": rows_saved,
+        "calculation_status": execution.calculation_status,
+        "pairs_published": execution.pairs_published,
         "window_days": window_days,
         "k": k,
     }

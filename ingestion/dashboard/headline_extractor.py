@@ -25,7 +25,7 @@ H1_REGEX = re.compile(r"<h1[^>]*>(.*?)</h1>", re.IGNORECASE | re.DOTALL)
 _HEADLINE_CACHE: dict[str, str | None] = {}
 
 
-def extract_page_title(source_url: str, timeout_seconds: int = 3) -> str | None:
+def extract_page_title(source_url: str, timeout_seconds: int = 1) -> str | None:
     """Fetch URL and extract page title tag or og:title.
     
     Returns clean headline string or None if un-fetchable and no slug available.
@@ -36,9 +36,15 @@ def extract_page_title(source_url: str, timeout_seconds: int = 3) -> str | None:
     if source_url in _HEADLINE_CACHE:
         return _HEADLINE_CACHE[source_url]
 
+    # Step 1: High-confidence URL slug extraction first (instant, zero-network)
+    slug_title = _extract_headline_from_url_slug(source_url)
+    if slug_title and len(slug_title) >= 20 and not _is_generic_site_title(slug_title) and len(slug_title.split()) >= 4:
+        _HEADLINE_CACHE[source_url] = slug_title
+        return slug_title
+
     result: str | None = None
 
-    # Step 1: Attempt HTTP Fetch
+    # Step 2: Attempt HTTP Fetch if slug was insufficient
     html_content = _fetch_page_head(source_url, timeout_seconds=timeout_seconds)
 
     if html_content:
@@ -66,11 +72,9 @@ def extract_page_title(source_url: str, timeout_seconds: int = 3) -> str | None:
                 if len(title) >= 12 and not _is_generic_site_title(title):
                     result = title
 
-    # Step 2: Fallback to high-confidence URL slug extraction
-    if not result:
-        slug_title = _extract_headline_from_url_slug(source_url)
-        if slug_title and len(slug_title) >= 15 and not _is_generic_site_title(slug_title):
-            result = slug_title
+    # Step 3: Fallback to partial slug if fetch failed
+    if not result and slug_title and len(slug_title) >= 15 and not _is_generic_site_title(slug_title):
+        result = slug_title
 
     _HEADLINE_CACHE[source_url] = result
     return result

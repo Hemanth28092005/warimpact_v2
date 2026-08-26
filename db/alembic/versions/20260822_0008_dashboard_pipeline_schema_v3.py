@@ -179,7 +179,7 @@ def upgrade() -> None:
             op.alter_column("regional_headlines", "validation_source", existing_type=sa.String(10), type_=sa.String(32))
 
     # Normalize existing legacy values
-    op.execute("UPDATE regional_headlines SET validation_source = 'legacy_import' WHERE validation_source IS NOT NULL AND validation_source NOT IN ('llm_groq', 'llm_gemini', 'rules', 'legacy_import', 'legacy', 'mock');")
+    op.execute("UPDATE regional_headlines SET validation_source = 'legacy_import' WHERE validation_source IS NOT NULL AND validation_source NOT IN ('groq', 'gemini', 'rules', 'legacy_import');")
     op.execute("UPDATE regional_headlines SET brief_source = 'legacy_unverified' WHERE brief_source IS NOT NULL AND brief_source NOT IN ('llm_grounded', 'template_fallback', 'legacy_unverified', 'none');")
 
     rh_checks = _get_existing_check_constraints(conn, "regional_headlines")
@@ -190,7 +190,7 @@ def upgrade() -> None:
         op.create_check_constraint("ck_regional_headlines_confidence", "regional_headlines", "confidence IS NULL OR (confidence >= 0.0 AND confidence <= 1.0)")
         record_provenance("constraint", "regional_headlines", "ck_regional_headlines_confidence")
     if "ck_regional_headlines_validation_source" not in rh_checks:
-        op.create_check_constraint("ck_regional_headlines_validation_source", "regional_headlines", "validation_source IS NULL OR validation_source IN ('llm_groq', 'llm_gemini', 'rules', 'legacy_import', 'legacy', 'mock')")
+        op.create_check_constraint("ck_regional_headlines_validation_source", "regional_headlines", "validation_source IS NULL OR validation_source IN ('groq', 'gemini', 'rules', 'legacy_import')")
         record_provenance("constraint", "regional_headlines", "ck_regional_headlines_validation_source")
     if "ck_regional_headlines_brief_source" not in rh_checks:
         op.create_check_constraint("ck_regional_headlines_brief_source", "regional_headlines", "brief_source IS NULL OR brief_source IN ('llm_grounded', 'template_fallback', 'legacy_unverified', 'none')")
@@ -222,7 +222,7 @@ def upgrade() -> None:
         WHERE action_type NOT IN ('diplomatic', 'regulatory', 'legislative', 'judicial', 'administrative', 'fiscal', 'security');
         """
     )
-    op.execute("UPDATE government_actions SET validation_source = 'legacy_import' WHERE validation_source IS NOT NULL AND validation_source NOT IN ('llm_groq', 'llm_gemini', 'rules', 'legacy_import', 'legacy', 'mock');")
+    op.execute("UPDATE government_actions SET validation_source = 'legacy_import' WHERE validation_source IS NOT NULL AND validation_source NOT IN ('groq', 'gemini', 'rules', 'legacy_import');")
     op.execute("UPDATE government_actions SET brief_source = 'legacy_unverified' WHERE brief_source IS NOT NULL AND brief_source NOT IN ('llm_grounded', 'template_fallback', 'legacy_unverified', 'none');")
 
     ga_checks = _get_existing_check_constraints(conn, "government_actions")
@@ -236,7 +236,7 @@ def upgrade() -> None:
         op.create_check_constraint("ck_government_actions_confidence", "government_actions", "confidence IS NULL OR (confidence >= 0.0 AND confidence <= 1.0)")
         record_provenance("constraint", "government_actions", "ck_government_actions_confidence")
     if "ck_government_actions_validation_source" not in ga_checks:
-        op.create_check_constraint("ck_government_actions_validation_source", "government_actions", "validation_source IS NULL OR validation_source IN ('llm_groq', 'llm_gemini', 'rules', 'legacy_import', 'legacy', 'mock')")
+        op.create_check_constraint("ck_government_actions_validation_source", "government_actions", "validation_source IS NULL OR validation_source IN ('groq', 'gemini', 'rules', 'legacy_import')")
         record_provenance("constraint", "government_actions", "ck_government_actions_validation_source")
     if "ck_government_actions_brief_source" not in ga_checks:
         op.create_check_constraint("ck_government_actions_brief_source", "government_actions", "brief_source IS NULL OR brief_source IN ('llm_grounded', 'template_fallback', 'legacy_unverified', 'none')")
@@ -270,7 +270,7 @@ def upgrade() -> None:
     op.execute("UPDATE protests SET location_name = city, location_level = 'city' WHERE location_name IS NULL AND city IS NOT NULL;")
 
     # Normalize existing legacy values
-    op.execute("UPDATE protests SET validation_source = 'legacy_import' WHERE validation_source IS NOT NULL AND validation_source NOT IN ('llm_groq', 'llm_gemini', 'rules', 'legacy_import', 'legacy', 'mock');")
+    op.execute("UPDATE protests SET validation_source = 'legacy_import' WHERE validation_source IS NOT NULL AND validation_source NOT IN ('groq', 'gemini', 'rules', 'legacy_import');")
     op.execute("UPDATE protests SET brief_source = 'legacy_unverified' WHERE brief_source IS NOT NULL AND brief_source NOT IN ('llm_grounded', 'template_fallback', 'legacy_unverified', 'none');")
     op.execute("UPDATE protests SET location_level = 'unknown' WHERE location_level IS NOT NULL AND location_level NOT IN ('venue', 'city', 'district', 'state', 'national', 'unknown');")
 
@@ -285,7 +285,7 @@ def upgrade() -> None:
         op.create_check_constraint("ck_protests_confidence", "protests", "confidence IS NULL OR (confidence >= 0.0 AND confidence <= 1.0)")
         record_provenance("constraint", "protests", "ck_protests_confidence")
     if "ck_protests_validation_source" not in pr_checks:
-        op.create_check_constraint("ck_protests_validation_source", "protests", "validation_source IS NULL OR validation_source IN ('llm_groq', 'llm_gemini', 'rules', 'legacy_import', 'legacy', 'mock')")
+        op.create_check_constraint("ck_protests_validation_source", "protests", "validation_source IS NULL OR validation_source IN ('groq', 'gemini', 'rules', 'legacy_import')")
         record_provenance("constraint", "protests", "ck_protests_validation_source")
     if "ck_protests_brief_source" not in pr_checks:
         op.create_check_constraint("ck_protests_brief_source", "protests", "brief_source IS NULL OR brief_source IN ('llm_grounded', 'template_fallback', 'legacy_unverified', 'none')")
@@ -308,7 +308,7 @@ def upgrade() -> None:
         elif col_name == "validation_source":
             op.alter_column("commodity_news", "validation_source", existing_type=sa.String(10), type_=sa.String(32))
 
-    op.execute("UPDATE commodity_news SET validation_source = 'legacy_import' WHERE validation_source IS NOT NULL AND validation_source NOT IN ('llm_groq', 'llm_gemini', 'rules', 'legacy_import', 'legacy', 'mock');")
+    op.execute("UPDATE commodity_news SET validation_source = 'legacy_import' WHERE validation_source IS NOT NULL AND validation_source NOT IN ('groq', 'gemini', 'rules', 'legacy_import');")
     op.execute("UPDATE commodity_news SET brief_source = 'legacy_unverified' WHERE brief_source IS NOT NULL AND brief_source NOT IN ('llm_grounded', 'template_fallback', 'legacy_unverified', 'none');")
 
     cn_checks = _get_existing_check_constraints(conn, "commodity_news")
@@ -319,7 +319,7 @@ def upgrade() -> None:
         op.create_check_constraint("ck_commodity_news_confidence", "commodity_news", "confidence IS NULL OR (confidence >= 0.0 AND confidence <= 1.0)")
         record_provenance("constraint", "commodity_news", "ck_commodity_news_confidence")
     if "ck_commodity_news_validation_source" not in cn_checks:
-        op.create_check_constraint("ck_commodity_news_validation_source", "commodity_news", "validation_source IS NULL OR validation_source IN ('llm_groq', 'llm_gemini', 'rules', 'legacy_import', 'legacy', 'mock')")
+        op.create_check_constraint("ck_commodity_news_validation_source", "commodity_news", "validation_source IS NULL OR validation_source IN ('groq', 'gemini', 'rules', 'legacy_import')")
         record_provenance("constraint", "commodity_news", "ck_commodity_news_validation_source")
     if "ck_commodity_news_brief_source" not in cn_checks:
         op.create_check_constraint("ck_commodity_news_brief_source", "commodity_news", "brief_source IS NULL OR brief_source IN ('llm_grounded', 'template_fallback', 'legacy_unverified', 'none')")
