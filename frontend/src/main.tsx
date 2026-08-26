@@ -554,11 +554,13 @@ function App(): JSX.Element {
             commodity: r.commodity_code,
             partner: r.partner_country,
             choke: r.primary_chokepoint ?? "direct",
+            color: r.risk_score >= 80 ? "#ef4444" : r.risk_score >= 60 ? "#f97316" : r.risk_score >= 35 ? "#eab308" : "#22d3ee",
           },
         }));
+        // Base subtle background track
         map.addSource("trade-routes", { type: "geojson", data: { type: "FeatureCollection", features } as never });
         map.addLayer({
-          id: "route-lines",
+          id: "route-lines-base",
           type: "line",
           source: "trade-routes",
           paint: {
@@ -566,59 +568,50 @@ function App(): JSX.Element {
               "interpolate", ["linear"], ["get", "risk"],
               0, "#2fd67b", 40, "#eab308", 65, "#f97316", 85, "#ef4444",
             ] as never,
-            "line-width": 1.6,
-            "line-opacity": 0.8,
+            "line-width": 1.2,
+            "line-opacity": 0.22,
           },
           layout: { "line-cap": "round" },
         });
 
-        // 3b. Moving Commodity Transport Arrows & Pulses (WorldMonitor style)
-        if (!map.getSource("trade-transport-arrows")) {
-          map.addSource("trade-transport-arrows", {
+        // Dynamic moving active line segments (oscillating back & forth with staggered timings)
+        if (!map.getSource("trade-routes-active")) {
+          map.addSource("trade-routes-active", {
             type: "geojson",
             data: { type: "FeatureCollection", features: [] } as never,
           });
           map.addLayer({
-            id: "route-arrow-glow",
-            type: "circle",
-            source: "trade-transport-arrows",
+            id: "route-lines-glow",
+            type: "line",
+            source: "trade-routes-active",
             paint: {
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 3.5, 4, 5, 8, 8],
-              "circle-color": ["get", "color"],
-              "circle-opacity": 0.85,
-              "circle-blur": 0.35,
+              "line-color": ["get", "color"],
+              "line-width": ["interpolate", ["linear"], ["zoom"], 1, 4.0, 4, 6.0, 8, 9.0],
+              "line-opacity": 0.45,
+              "line-blur": 2.2,
             },
+            layout: { "line-cap": "round", "line-join": "round" },
           });
           map.addLayer({
-            id: "route-arrow-chevron",
-            type: "symbol",
-            source: "trade-transport-arrows",
-            layout: {
-              "text-field": "▶",
-              "text-size": ["interpolate", ["linear"], ["zoom"], 1, 8.5, 4, 11, 8, 15],
-              "text-rotate": ["get", "bearing"],
-              "text-rotation-alignment": "map",
-              "text-allow-overlap": true,
-              "text-ignore-placement": true,
-            },
+            id: "route-lines-active",
+            type: "line",
+            source: "trade-routes-active",
             paint: {
-              "text-color": ["get", "color"],
-              "text-halo-color": "#010409",
-              "text-halo-width": 1.2,
+              "line-color": ["get", "color"],
+              "line-width": ["interpolate", ["linear"], ["zoom"], 1, 2.2, 4, 3.2, 8, 4.5],
+              "line-opacity": 0.95,
             },
+            layout: { "line-cap": "round", "line-join": "round" },
           });
         }
 
-        map.on("click", "route-lines", (e) => {
+        const handleRouteClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
           const f = e.features?.[0];
           if (!f) return;
-          showPopup(map, e.lngLat, `<div class="wm-pop"><span class="wm-pop-code">${f.properties?.commodity}</span> → ${f.properties?.partner}<br/>risk <b>${Number(f.properties?.risk).toFixed(1)}</b>/100<br/><span class="wm-pop-dim">via ${f.properties?.choke}</span></div>`);
-        });
-        map.on("click", "route-arrow-chevron", (e) => {
-          const f = e.features?.[0];
-          if (!f) return;
-          showPopup(map, e.lngLat, `<div class="wm-pop"><span class="wm-pop-code">${f.properties?.commodity}</span> Conveyance<br/>Target: <b>${f.properties?.partner}</b><br/>Risk Score: <b>${Number(f.properties?.risk).toFixed(1)}</b>/100</div>`);
-        });
+          showPopup(map, e.lngLat, `<div class="wm-pop"><span class="wm-pop-code">${f.properties?.commodity}</span> → ${f.properties?.partner}<br/>risk <b>${Number(f.properties?.risk).toFixed(1)}</b>/100<br/><span class="wm-pop-dim">via ${f.properties?.choke ?? "direct corridor"}</span></div>`);
+        };
+        map.on("click", "route-lines-base", handleRouteClick);
+        map.on("click", "route-lines-active", handleRouteClick);
       }
 
       // 4. Military Flights
@@ -811,9 +804,9 @@ function App(): JSX.Element {
       vis("cii-line", layers.cii);
       vis("quake-circles", layers.quakes);
       vis("protest-circles", layers.protests);
-      vis("route-lines", layers.routes);
-      vis("route-arrow-glow", layers.routes);
-      vis("route-arrow-chevron", layers.routes);
+      vis("route-lines-base", layers.routes);
+      vis("route-lines-glow", layers.routes);
+      vis("route-lines-active", layers.routes);
       vis("flight-circles", layers.flights);
       vis("intel-bases-layer", layers.bases);
       vis("intel-nuclear-layer", layers.nuclear);
@@ -827,19 +820,19 @@ function App(): JSX.Element {
     apply();
   }, [layers, quakes, protests, routes, flights, intelSites, intelRoutes, loaded, mapTheme]);
 
-  // Moving Commodity Transport Arrows Animation (WorldMonitor style, with staggered intervals)
+  // Moving Commodity Transport Lines Animation (Gliding back-and-forth at staggered intervals)
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !loaded.routes || routes.length === 0 || !layers.routes) return;
 
-    // Precompute geodesic paths and staggered frequency parameters
+    // Precompute geodesic paths and staggered oscillation parameters
     const animatedTracks = routes.map((r, idx) => {
       const path = greatCircle([r.origin_long, r.origin_lat], [r.dest_long, r.dest_lat], 50);
       const color = r.risk_score >= 80 ? "#ef4444" : r.risk_score >= 60 ? "#f97316" : r.risk_score >= 35 ? "#eab308" : "#22d3ee";
-      // Stagger durations between 5000ms and 12500ms based on distance and route index
-      const durationMs = 5000 + ((idx * 811) % 7500);
-      // Stagger multiple convoy pulse offsets along each corridor
-      const pulseOffsets = [0.0, 0.42, 0.84].map((o) => (o + (idx * 0.17)) % 1.0);
+      // Stagger durations between 4200ms and 9500ms based on distance and route index
+      const durationMs = 4200 + ((idx * 683) % 5500);
+      // Stagger phase offset so they move back and forth at completely different times
+      const phaseOffset = (idx * 1337) % 9000;
       return {
         id: r.id,
         commodity: r.commodity_code,
@@ -848,50 +841,47 @@ function App(): JSX.Element {
         color,
         path,
         durationMs,
-        pulseOffsets,
+        phaseOffset,
       };
     });
 
     let animId: number;
     let lastRenderTime = 0;
 
-    const animateArrows = (now: number) => {
+    const animateLines = (now: number) => {
       // Smooth ~40-60 FPS rendering
       if (now - lastRenderTime >= 24) {
         lastRenderTime = now;
-        const source = map.getSource("trade-transport-arrows") as maplibregl.GeoJSONSource | undefined;
-        if (source && map.getLayer("route-arrow-chevron")) {
+        const source = map.getSource("trade-routes-active") as maplibregl.GeoJSONSource | undefined;
+        if (source && map.getLayer("route-lines-active")) {
           const features: GeoJSON.Feature[] = [];
           for (const track of animatedTracks) {
             const N = track.path.length;
-            if (N < 2) continue;
+            if (N < 4) continue;
 
-            for (const offset of track.pulseOffsets) {
-              const progress = ((now / track.durationMs) + offset) % 1.0;
-              const exactIdx = progress * (N - 1);
-              const i0 = Math.floor(exactIdx);
-              const i1 = Math.min(N - 1, i0 + 1);
-              const ratio = exactIdx - i0;
+            // Smooth back-and-forth sinusoidal oscillation [0.0, 1.0]
+            const angle = (2 * Math.PI * (now + track.phaseOffset)) / track.durationMs;
+            const progress = 0.5 * (1 - Math.cos(angle));
 
-              const p0 = track.path[i0];
-              const p1 = track.path[i1];
+            // Dynamic active line segment length (approx 30% to 40% of arc)
+            const segLen = Math.max(6, Math.round(N * 0.35));
+            const maxStart = N - segLen;
+            const startIdx = Math.round(progress * maxStart);
+            const endIdx = Math.min(N, startIdx + segLen);
 
-              // Smooth great-circle coordinate interpolation
-              const lng = p0[0] + (p1[0] - p0[0]) * ratio;
-              const lat = p0[1] + (p1[1] - p0[1]) * ratio;
-
-              // Calculate tangent bearing for directional orientation
-              const bearing = calculateBearing(p0, p1);
-
+            const segmentCoords = track.path.slice(startIdx, endIdx);
+            if (segmentCoords.length >= 2) {
               features.push({
                 type: "Feature",
-                geometry: { type: "Point", coordinates: [lng, lat] },
+                geometry: {
+                  type: "LineString",
+                  coordinates: segmentCoords,
+                },
                 properties: {
-                  bearing,
-                  color: track.color,
                   commodity: track.commodity,
                   partner: track.partner,
                   risk: track.risk,
+                  color: track.color,
                 },
               });
             }
@@ -899,10 +889,10 @@ function App(): JSX.Element {
           source.setData({ type: "FeatureCollection", features } as never);
         }
       }
-      animId = requestAnimationFrame(animateArrows);
+      animId = requestAnimationFrame(animateLines);
     };
 
-    animId = requestAnimationFrame(animateArrows);
+    animId = requestAnimationFrame(animateLines);
     return () => {
       cancelAnimationFrame(animId);
     };
