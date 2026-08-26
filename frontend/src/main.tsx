@@ -102,9 +102,10 @@ const REALISTIC_SATELLITE_STYLE: maplibregl.StyleSpecification = {
       type: "raster",
       source: "esri-satellite",
       paint: {
-        "raster-brightness-max": 0.88,
-        "raster-contrast": 0.15,
-        "raster-saturation": -0.05,
+        "raster-opacity": 1.0,
+        "raster-brightness-max": 0.95,
+        "raster-contrast": 0.22,
+        "raster-saturation": 0.05,
       },
     },
   ],
@@ -796,6 +797,95 @@ function App(): JSX.Element {
         (map.getSource("intel-routes") as maplibregl.GeoJSONSource).setData(intelRouteData as never);
       }
 
+      // 7. Strategic Maritime Chokepoints (WebGL Native Layer with 3D Globe Depth Occlusion)
+      const chokeData = {
+        type: "FeatureCollection" as const,
+        features: chokepoints.map((cp) => {
+          const color =
+            cp.status === "critical"
+              ? "#ef4444"
+              : cp.status === "elevated"
+              ? "#f97316"
+              : cp.status === "watch"
+              ? "#eab308"
+              : "#22c55e";
+          return {
+            type: "Feature" as const,
+            geometry: { type: "Point" as const, coordinates: [cp.long, cp.lat] },
+            properties: {
+              code: cp.code,
+              name: cp.name,
+              status: cp.status,
+              score: cp.disruption_score,
+              oil: cp.baseline_mbd ?? 0,
+              reason: cp.last_disruption_reason ?? "",
+              color,
+            },
+          };
+        }),
+      };
+      if (!map.getSource("chokepoint-points") && loaded.chokes && chokepoints.length > 0) {
+        map.addSource("chokepoint-points", { type: "geojson", data: chokeData as never });
+        // Glowing halo
+        map.addLayer({
+          id: "choke-pulse-glow",
+          type: "circle",
+          source: "chokepoint-points",
+          paint: {
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 6, 4, 10, 8, 16],
+            "circle-color": ["get", "color"],
+            "circle-opacity": 0.45,
+            "circle-blur": 0.45,
+          },
+        });
+        // Core symbol circle
+        map.addLayer({
+          id: "choke-circles",
+          type: "circle",
+          source: "chokepoint-points",
+          paint: {
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 3.2, 4, 5, 8, 8],
+            "circle-color": "#ffffff",
+            "circle-stroke-color": ["get", "color"],
+            "circle-stroke-width": 2,
+            "circle-opacity": 1.0,
+          },
+        });
+        // Crisp text label
+        map.addLayer({
+          id: "choke-labels",
+          type: "symbol",
+          source: "chokepoint-points",
+          layout: {
+            "text-field": ["get", "name"],
+            "text-size": ["interpolate", ["linear"], ["zoom"], 1, 9, 4, 11, 8, 13],
+            "text-offset": [0, 1.2],
+            "text-anchor": "top",
+            "text-allow-overlap": false,
+            "text-ignore-placement": false,
+          },
+          paint: {
+            "text-color": "#f8fafc",
+            "text-halo-color": "#020617",
+            "text-halo-width": 1.5,
+          },
+        });
+
+        const handleChokeClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
+          const f = e.features?.[0];
+          if (!f) return;
+          showPopup(
+            map,
+            e.lngLat,
+            `<div class="wm-pop"><span class="wm-pop-code">${f.properties?.name}</span> (${f.properties?.code})<br/>Disruption: <b>${Number(f.properties?.score).toFixed(0)}</b>/100 [${String(f.properties?.status || "").toUpperCase()}]<br/><span class="wm-pop-dim">Baseline: ${f.properties?.oil} MBD ${f.properties?.reason ? `| ${f.properties?.reason}` : ""}</span></div>`
+          );
+        };
+        map.on("click", "choke-circles", handleChokeClick);
+        map.on("click", "choke-labels", handleChokeClick);
+      } else if (map.getSource("chokepoint-points")) {
+        (map.getSource("chokepoint-points") as maplibregl.GeoJSONSource).setData(chokeData as never);
+      }
+
       // Visibility toggles
       const vis = (name: string, on: boolean) => {
         if (map.getLayer(name)) map.setLayoutProperty(name, "visibility", on ? "visible" : "none");
@@ -812,13 +902,12 @@ function App(): JSX.Element {
       vis("intel-nuclear-layer", layers.nuclear);
       vis("intel-spaceports-layer", layers.spaceports);
       vis("intel-routes-lines", layers.cables);
-
-      document.querySelectorAll(".cp-marker").forEach((el) => {
-        (el as HTMLElement).style.display = layers.chokes ? "" : "none";
-      });
+      vis("choke-pulse-glow", layers.chokes);
+      vis("choke-circles", layers.chokes);
+      vis("choke-labels", layers.chokes);
     };
     apply();
-  }, [layers, quakes, protests, routes, flights, intelSites, intelRoutes, loaded, mapTheme]);
+  }, [layers, quakes, protests, routes, flights, chokepoints, intelSites, intelRoutes, loaded, mapTheme]);
 
   // Moving Commodity Transport Lines Animation (Gliding back-and-forth at staggered intervals)
   useEffect(() => {
@@ -897,20 +986,6 @@ function App(): JSX.Element {
       cancelAnimationFrame(animId);
     };
   }, [routes, loaded.routes, layers.routes]);
-
-  // Chokepoints 3D Markers
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !loaded.chokes || chokepoints.length === 0) return;
-    if ((map as unknown as { _chokesAdded?: boolean })._chokesAdded) return;
-    (map as unknown as { _chokesAdded?: boolean })._chokesAdded = true;
-    chokepoints.forEach((cp) => {
-      const el = document.createElement("div");
-      el.className = `cp-marker cp-${cp.status}`;
-      el.title = `${cp.name} — disruption ${cp.disruption_score.toFixed(0)} (${cp.status})`;
-      new maplibregl.Marker({ element: el }).setLngLat([cp.long, cp.lat]).addTo(map);
-    });
-  }, [chokepoints, loaded.chokes]);
 
   const scoresArr = Array.from(ciiScores.entries()).sort((a, b) => b[1] - a[1]);
   const avgCii = scoresArr.length ? scoresArr.reduce((a, [, v]) => a + v, 0) / scoresArr.length : null;
