@@ -10,7 +10,6 @@ import {
   Flight,
   IntelSite,
   IntelRoute,
-  CiiScore,
 } from "../types";
 import { greatCircle, showPopup } from "../utils/geo";
 
@@ -83,6 +82,7 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
   intelRoutes,
   loaded,
 }) => {
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const {
     view3d,
@@ -96,9 +96,11 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
 
   // 1. Initialize Map
   useEffect(() => {
+    if (!mapContainerRef.current) return;
+
     const styleObj = mapTheme === "satellite" ? REALISTIC_SATELLITE_STYLE : DARK_TACTICAL_STYLE;
     const map = new maplibregl.Map({
-      container: "globe",
+      container: mapContainerRef.current,
       style: styleObj,
       center: [42, 26],
       zoom: view3d ? 1.6 : 2,
@@ -108,11 +110,19 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
     mapRef.current = map;
 
     map.on("style.load", () => {
-      map.setProjection({ type: view3d ? "globe" : "mercator" });
+      try {
+        map.setProjection({ type: view3d ? "globe" : "mercator" });
+      } catch (err) {
+        console.warn("Projection load error:", err);
+      }
     });
 
     return () => {
-      map.remove();
+      try {
+        map.remove();
+      } catch (err) {
+        console.warn("Map remove error:", err);
+      }
       mapRef.current = null;
     };
   }, [mapTheme]);
@@ -120,8 +130,12 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
   // 2. View 3D Projection update
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
-    map.setProjection({ type: view3d ? "globe" : "mercator" });
+    if (!map || !map.isStyleLoaded()) return;
+    try {
+      map.setProjection({ type: view3d ? "globe" : "mercator" });
+    } catch (err) {
+      console.warn("Projection update error:", err);
+    }
   }, [view3d]);
 
   // 3. Orbit Rotation
@@ -156,437 +170,448 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
     };
   }, [view3d, autoRotate]);
 
-  // 4. Render & Update all Dynamic Layers
+  // 4. Render & Update all Dynamic Layers safely after style load
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
     const apply = () => {
-      // 1. Quakes
-      const quakeData = {
-        type: "FeatureCollection" as const,
-        features: quakes.map((q) => ({
-          type: "Feature" as const,
-          geometry: { type: "Point" as const, coordinates: [q.longitude, q.latitude] },
-          properties: { mag: q.magnitude, place: q.place ?? "", id: q.external_id },
-        })),
-      };
-      if (!map.getSource("quakes") && loaded.quakes) {
-        map.addSource("quakes", { type: "geojson", data: quakeData as never });
-        map.addLayer({
-          id: "quake-circles",
-          type: "circle",
-          source: "quakes",
-          paint: {
-            "circle-radius": [
-              "interpolate", ["linear"], ["get", "mag"],
-              4, 3, 5, 6, 6, 11, 7, 18, 8, 26,
-            ],
-            "circle-color": [
-              "interpolate", ["linear"], ["get", "mag"],
-              4, "rgba(250,204,21,0.7)", 5.5, "rgba(249,115,22,0.85)", 7, "rgba(239,68,68,0.95)",
-            ],
-            "circle-stroke-color": "#ffffff",
-            "circle-stroke-width": 1.2,
-            "circle-opacity": 0.88,
-          },
-        });
-        map.on("click", "quake-circles", (e) => {
-          const f = e.features?.[0];
-          if (!f) return;
-          showPopup(map, e.lngLat, `<div class="wm-pop"><span class="wm-pop-code">M${Number(f.properties?.mag).toFixed(1)}</span> SEISMIC EVENT<br/>${f.properties?.place || "Offshore"}</div>`);
-        });
-      } else if (map.getSource("quakes")) {
-        (map.getSource("quakes") as maplibregl.GeoJSONSource).setData(quakeData as never);
-      }
+      if (!map || !map.isStyleLoaded()) return;
 
-      // 2. Protests & Civil Unrest
-      const protestData = {
-        type: "FeatureCollection" as const,
-        features: protests.filter((p) => p.action_geo_lat !== null && p.action_geo_long !== null).map((p) => ({
-          type: "Feature" as const,
-          geometry: { type: "Point" as const, coordinates: [p.action_geo_long!, p.action_geo_lat!] },
-          properties: {
-            headline: p.headline,
-            city: p.city || p.location_name || "",
-            loc: p.location_name || p.city || "",
-            sev: p.event_severity,
-            source: p.validation_source || "gdelt",
-          },
-        })),
-      };
-      if (!map.getSource("protests") && loaded.protests) {
-        map.addSource("protests", { type: "geojson", data: protestData as never });
-        map.addLayer({
-          id: "protest-circles",
-          type: "circle",
-          source: "protests",
-          paint: {
-            "circle-radius": [
-              "interpolate", ["linear"], ["get", "sev"],
-              20, 3.5, 50, 6, 80, 11, 100, 15,
-            ],
-            "circle-color": [
-              "interpolate", ["linear"], ["get", "sev"],
-              0, "rgba(251,191,36,0.8)", 50, "rgba(249,115,22,0.9)", 75, "rgba(239,68,68,0.95)",
-            ],
-            "circle-stroke-color": "#ffffff",
-            "circle-stroke-width": 1,
-            "circle-opacity": 0.9,
-          },
-        });
-        map.on("click", "protest-circles", (e) => {
-          const f = e.features?.[0];
-          if (!f) return;
-          showPopup(map, e.lngLat, `<div class="wm-pop"><span class="wm-pop-dim">${f.properties?.loc}</span><br/>${f.properties?.headline}</div>`);
-        });
-      } else if (map.getSource("protests")) {
-        (map.getSource("protests") as maplibregl.GeoJSONSource).setData(protestData as never);
-      }
+      try {
+        // 1. Quakes
+        const quakeData = {
+          type: "FeatureCollection" as const,
+          features: quakes.map((q) => ({
+            type: "Feature" as const,
+            geometry: { type: "Point" as const, coordinates: [q.longitude, q.latitude] },
+            properties: { mag: q.magnitude, place: q.place ?? "", id: q.external_id },
+          })),
+        };
+        if (!map.getSource("quakes") && loaded.quakes) {
+          map.addSource("quakes", { type: "geojson", data: quakeData as never });
+          map.addLayer({
+            id: "quake-circles",
+            type: "circle",
+            source: "quakes",
+            paint: {
+              "circle-radius": [
+                "interpolate", ["linear"], ["get", "mag"],
+                4, 3, 5, 6, 6, 11, 7, 18, 8, 26,
+              ],
+              "circle-color": [
+                "interpolate", ["linear"], ["get", "mag"],
+                4, "rgba(250,204,21,0.7)", 5.5, "rgba(249,115,22,0.85)", 7, "rgba(239,68,68,0.95)",
+              ],
+              "circle-stroke-color": "#ffffff",
+              "circle-stroke-width": 1.2,
+              "circle-opacity": 0.88,
+            },
+          });
+          map.on("click", "quake-circles", (e) => {
+            const f = e.features?.[0];
+            if (!f) return;
+            showPopup(map, e.lngLat, `<div class="wm-pop"><span class="wm-pop-code">M${Number(f.properties?.mag).toFixed(1)}</span> SEISMIC EVENT<br/>${f.properties?.place || "Offshore"}</div>`);
+          });
+        } else if (map.getSource("quakes")) {
+          (map.getSource("quakes") as maplibregl.GeoJSONSource).setData(quakeData as never);
+        }
 
-      // 3. Trade routes
-      if (!map.getSource("trade-routes") && loaded.routes && routes.length > 0) {
-        const features = routes.map((r) => ({
+        // 2. Protests & Civil Unrest
+        const protestData = {
+          type: "FeatureCollection" as const,
+          features: protests.filter((p) => p.action_geo_lat !== null && p.action_geo_long !== null).map((p) => ({
+            type: "Feature" as const,
+            geometry: { type: "Point" as const, coordinates: [p.action_geo_long!, p.action_geo_lat!] },
+            properties: {
+              headline: p.headline,
+              city: p.city || p.location_name || "",
+              loc: p.location_name || p.city || "",
+              sev: p.event_severity,
+              source: p.validation_source || "gdelt",
+            },
+          })),
+        };
+        if (!map.getSource("protests") && loaded.protests) {
+          map.addSource("protests", { type: "geojson", data: protestData as never });
+          map.addLayer({
+            id: "protest-circles",
+            type: "circle",
+            source: "protests",
+            paint: {
+              "circle-radius": [
+                "interpolate", ["linear"], ["get", "sev"],
+                20, 3.5, 50, 6, 80, 11, 100, 15,
+              ],
+              "circle-color": [
+                "interpolate", ["linear"], ["get", "sev"],
+                0, "rgba(251,191,36,0.8)", 50, "rgba(249,115,22,0.9)", 75, "rgba(239,68,68,0.95)",
+              ],
+              "circle-stroke-color": "#ffffff",
+              "circle-stroke-width": 1,
+              "circle-opacity": 0.9,
+            },
+          });
+          map.on("click", "protest-circles", (e) => {
+            const f = e.features?.[0];
+            if (!f) return;
+            showPopup(map, e.lngLat, `<div class="wm-pop"><span class="wm-pop-dim">${f.properties?.loc}</span><br/>${f.properties?.headline}</div>`);
+          });
+        } else if (map.getSource("protests")) {
+          (map.getSource("protests") as maplibregl.GeoJSONSource).setData(protestData as never);
+        }
+
+        // 3. Trade routes
+        if (!map.getSource("trade-routes") && loaded.routes && routes.length > 0) {
+          const features = routes.map((r) => ({
+            type: "Feature" as const,
+            geometry: {
+              type: "LineString" as const,
+              coordinates: greatCircle([r.origin_long, r.origin_lat], [r.dest_long, r.dest_lat]),
+            },
+            properties: {
+              risk: r.risk_score,
+              commodity: r.commodity_code,
+              partner: r.partner_country,
+              choke: r.primary_chokepoint ?? "direct",
+              color: r.risk_score >= 80 ? "#ef4444" : r.risk_score >= 60 ? "#f97316" : r.risk_score >= 35 ? "#eab308" : "#22d3ee",
+            },
+          }));
+          map.addSource("trade-routes", { type: "geojson", data: { type: "FeatureCollection", features } as never });
+          map.addLayer({
+            id: "route-lines-base",
+            type: "line",
+            source: "trade-routes",
+            paint: {
+              "line-color": [
+                "interpolate", ["linear"], ["get", "risk"],
+                0, "#2fd67b", 40, "#eab308", 65, "#f97316", 85, "#ef4444",
+              ] as never,
+              "line-width": 1.2,
+              "line-opacity": 0.22,
+            },
+            layout: { "line-cap": "round" },
+          });
+
+          if (!map.getSource("trade-routes-active")) {
+            map.addSource("trade-routes-active", {
+              type: "geojson",
+              data: { type: "FeatureCollection", features: [] } as never,
+            });
+            map.addLayer({
+              id: "route-lines-glow",
+              type: "line",
+              source: "trade-routes-active",
+              paint: {
+                "line-color": ["get", "color"],
+                "line-width": ["interpolate", ["linear"], ["zoom"], 1, 4.0, 4, 6.0, 8, 9.0],
+                "line-opacity": 0.45,
+                "line-blur": 2.2,
+              },
+              layout: { "line-cap": "round", "line-join": "round" },
+            });
+            map.addLayer({
+              id: "route-lines-active",
+              type: "line",
+              source: "trade-routes-active",
+              paint: {
+                "line-color": ["get", "color"],
+                "line-width": ["interpolate", ["linear"], ["zoom"], 1, 2.2, 4, 3.2, 8, 4.5],
+                "line-opacity": 0.95,
+              },
+              layout: { "line-cap": "round", "line-join": "round" },
+            });
+          }
+
+          const handleRouteClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
+            const f = e.features?.[0];
+            if (!f) return;
+            showPopup(map, e.lngLat, `<div class="wm-pop"><span class="wm-pop-code">${f.properties?.commodity}</span> → ${f.properties?.partner}<br/>risk <b>${Number(f.properties?.risk).toFixed(1)}</b>/100<br/><span class="wm-pop-dim">via ${f.properties?.choke ?? "direct corridor"}</span></div>`);
+          };
+          map.on("click", "route-lines-base", handleRouteClick);
+          map.on("click", "route-lines-active", handleRouteClick);
+        }
+
+        // 4. Military Flights
+        const flightData = {
+          type: "FeatureCollection" as const,
+          features: flights.map((fl) => ({
+            type: "Feature" as const,
+            geometry: { type: "Point" as const, coordinates: [fl.longitude, fl.latitude] },
+            properties: {
+              hex: fl.hex,
+              callsign: fl.callsign ?? fl.hex,
+              type: fl.aircraft_type ?? "MIL",
+              alt: fl.altitude_ft,
+              spd: fl.ground_speed_kt,
+              squawk: fl.squawk,
+              reg: fl.registration,
+            },
+          })),
+        };
+        if (!map.getSource("military-flights") && loaded.flights && flights.length > 0) {
+          map.addSource("military-flights", { type: "geojson", data: flightData as never });
+          map.addLayer({
+            id: "flight-circles",
+            type: "circle",
+            source: "military-flights",
+            paint: {
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 2.5, 4, 4, 8, 7],
+              "circle-color": "#00e5ff",
+              "circle-stroke-color": "#ffffff",
+              "circle-stroke-width": 0.8,
+              "circle-opacity": 0.95,
+            },
+          });
+          map.on("click", "flight-circles", (e) => {
+            const f = e.features?.[0];
+            if (!f) return;
+            showPopup(map, e.lngLat, `
+              <div class="wm-pop">
+                <span class="wm-pop-code">${f.properties?.callsign}</span> (${f.properties?.type})<br/>
+                <b>MILITARY FLIGHT</b> · SQUAWK ${f.properties?.squawk || "—"}<br/>
+                <span class="wm-pop-dim">Alt: ${f.properties?.alt ? `${f.properties?.alt} ft` : "—"} | Spd: ${f.properties?.spd ? `${f.properties?.spd} kt` : "—"}</span>
+              </div>
+            `);
+          });
+        } else if (map.getSource("military-flights")) {
+          (map.getSource("military-flights") as maplibregl.GeoJSONSource).setData(flightData as never);
+        }
+
+        // 5. Strategic Intel Sites
+        const siteFeatures = intelSites.map((s) => ({
+          type: "Feature" as const,
+          geometry: { type: "Point" as const, coordinates: [s.longitude, s.latitude] },
+          properties: { cat: s.category, name: s.name, cc: s.country_code },
+        }));
+        const siteData = { type: "FeatureCollection" as const, features: siteFeatures };
+        if (!map.getSource("intel-sites") && loaded.intel && intelSites.length > 0) {
+          map.addSource("intel-sites", { type: "geojson", data: siteData as never });
+          map.addLayer({
+            id: "intel-bases-layer",
+            type: "circle",
+            source: "intel-sites",
+            filter: ["==", ["get", "cat"], "military_base"],
+            paint: {
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 2.5, 4, 4.5, 8, 8],
+              "circle-color": "#3b82f6",
+              "circle-stroke-color": "#ffffff",
+              "circle-stroke-width": 1,
+              "circle-opacity": 0.9,
+            },
+          });
+          map.addLayer({
+            id: "intel-nuclear-layer",
+            type: "circle",
+            source: "intel-sites",
+            filter: ["==", ["get", "cat"], "nuclear_site"],
+            paint: {
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 3.5, 4, 5.5, 8, 9],
+              "circle-color": "#eab308",
+              "circle-stroke-color": "#000000",
+              "circle-stroke-width": 1.2,
+              "circle-opacity": 0.95,
+            },
+          });
+          map.addLayer({
+            id: "intel-spaceports-layer",
+            type: "circle",
+            source: "intel-sites",
+            filter: ["==", ["get", "cat"], "spaceport"],
+            paint: {
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 3, 4, 5, 8, 8],
+              "circle-color": "#a855f7",
+              "circle-stroke-color": "#ffffff",
+              "circle-stroke-width": 1,
+              "circle-opacity": 0.9,
+            },
+          });
+          const handleSiteClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
+            const f = e.features?.[0];
+            if (!f) return;
+            const catLabel = String(f.properties?.cat ?? "").replace("_", " ").toUpperCase();
+            showPopup(map, e.lngLat, `
+              <div class="wm-pop">
+                <span class="wm-pop-code">${catLabel}</span><br/>
+                <b>${f.properties?.name}</b> (${f.properties?.cc || "—"})<br/>
+                <span class="wm-pop-dim">Strategic intelligence facility</span>
+              </div>
+            `);
+          };
+          map.on("click", "intel-bases-layer", handleSiteClick);
+          map.on("click", "intel-nuclear-layer", handleSiteClick);
+          map.on("click", "intel-spaceports-layer", handleSiteClick);
+        } else if (map.getSource("intel-sites")) {
+          (map.getSource("intel-sites") as maplibregl.GeoJSONSource).setData(siteData as never);
+        }
+
+        // 6. Intel Routes (Cables & Pipelines)
+        const intelRouteFeatures = intelRoutes.map((r) => ({
           type: "Feature" as const,
           geometry: {
             type: "LineString" as const,
-            coordinates: greatCircle([r.origin_long, r.origin_lat], [r.dest_long, r.dest_lat]),
+            coordinates: greatCircle([r.from_long, r.from_lat], [r.to_long, r.to_lat]),
           },
           properties: {
-            risk: r.risk_score,
-            commodity: r.commodity_code,
-            partner: r.partner_country,
-            choke: r.primary_chokepoint ?? "direct",
-            color: r.risk_score >= 80 ? "#ef4444" : r.risk_score >= 60 ? "#f97316" : r.risk_score >= 35 ? "#eab308" : "#22d3ee",
+            cat: r.category,
+            name: r.name,
+            fn: r.from_name,
+            tn: r.to_name,
           },
         }));
-        map.addSource("trade-routes", { type: "geojson", data: { type: "FeatureCollection", features } as never });
-        map.addLayer({
-          id: "route-lines-base",
-          type: "line",
-          source: "trade-routes",
-          paint: {
-            "line-color": [
-              "interpolate", ["linear"], ["get", "risk"],
-              0, "#2fd67b", 40, "#eab308", 65, "#f97316", 85, "#ef4444",
-            ] as never,
-            "line-width": 1.2,
-            "line-opacity": 0.22,
-          },
-          layout: { "line-cap": "round" },
-        });
-
-        if (!map.getSource("trade-routes-active")) {
-          map.addSource("trade-routes-active", {
-            type: "geojson",
-            data: { type: "FeatureCollection", features: [] } as never,
-          });
+        const intelRouteData = {
+          type: "FeatureCollection" as const,
+          features: intelRouteFeatures,
+        };
+        if (!map.getSource("intel-routes") && loaded.intel && intelRoutes.length > 0) {
+          map.addSource("intel-routes", { type: "geojson", data: intelRouteData as never });
           map.addLayer({
-            id: "route-lines-glow",
+            id: "intel-routes-lines",
             type: "line",
-            source: "trade-routes-active",
+            source: "intel-routes",
             paint: {
-              "line-color": ["get", "color"],
-              "line-width": ["interpolate", ["linear"], ["zoom"], 1, 4.0, 4, 6.0, 8, 9.0],
-              "line-opacity": 0.45,
-              "line-blur": 2.2,
+              "line-color": [
+                "match",
+                ["get", "cat"],
+                "undersea_cable", "#06b6d4",
+                "pipeline", "#f59e0b",
+                "#94a3b8",
+              ] as never,
+              "line-width": 1.5,
+              "line-dasharray": [3, 2],
+              "line-opacity": 0.75,
             },
-            layout: { "line-cap": "round", "line-join": "round" },
           });
-          map.addLayer({
-            id: "route-lines-active",
-            type: "line",
-            source: "trade-routes-active",
-            paint: {
-              "line-color": ["get", "color"],
-              "line-width": ["interpolate", ["linear"], ["zoom"], 1, 2.2, 4, 3.2, 8, 4.5],
-              "line-opacity": 0.95,
-            },
-            layout: { "line-cap": "round", "line-join": "round" },
+          map.on("click", "intel-routes-lines", (e) => {
+            const f = e.features?.[0];
+            if (!f) return;
+            const catLabel = String(f.properties?.cat ?? "").replace("_", " ").toUpperCase();
+            showPopup(map, e.lngLat, `
+              <div class="wm-pop">
+                <span class="wm-pop-code">${catLabel}</span><br/>
+                <b>${f.properties?.name}</b><br/>
+                <span class="wm-pop-dim">${f.properties?.fn} ⇄ ${f.properties?.tn}</span>
+              </div>
+            `);
           });
+        } else if (map.getSource("intel-routes")) {
+          (map.getSource("intel-routes") as maplibregl.GeoJSONSource).setData(intelRouteData as never);
         }
 
-        const handleRouteClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
-          const f = e.features?.[0];
-          if (!f) return;
-          showPopup(map, e.lngLat, `<div class="wm-pop"><span class="wm-pop-code">${f.properties?.commodity}</span> → ${f.properties?.partner}<br/>risk <b>${Number(f.properties?.risk).toFixed(1)}</b>/100<br/><span class="wm-pop-dim">via ${f.properties?.choke ?? "direct corridor"}</span></div>`);
+        // 7. Strategic Maritime Chokepoints (WebGL Native Layer with 3D Globe Depth Occlusion)
+        const chokeData = {
+          type: "FeatureCollection" as const,
+          features: chokepoints.map((cp) => {
+            const color =
+              cp.status === "critical"
+                ? "#ef4444"
+                : cp.status === "elevated"
+                ? "#f97316"
+                : cp.status === "watch"
+                ? "#eab308"
+                : "#22c55e";
+            return {
+              type: "Feature" as const,
+              geometry: { type: "Point" as const, coordinates: [cp.long, cp.lat] },
+              properties: {
+                code: cp.code,
+                name: cp.name,
+                status: cp.status,
+                score: cp.disruption_score,
+                oil: cp.baseline_mbd ?? 0,
+                reason: cp.last_disruption_reason ?? "",
+                color,
+              },
+            };
+          }),
         };
-        map.on("click", "route-lines-base", handleRouteClick);
-        map.on("click", "route-lines-active", handleRouteClick);
-      }
-
-      // 4. Military Flights
-      const flightData = {
-        type: "FeatureCollection" as const,
-        features: flights.map((fl) => ({
-          type: "Feature" as const,
-          geometry: { type: "Point" as const, coordinates: [fl.longitude, fl.latitude] },
-          properties: {
-            hex: fl.hex,
-            callsign: fl.callsign ?? fl.hex,
-            type: fl.aircraft_type ?? "MIL",
-            alt: fl.altitude_ft,
-            spd: fl.ground_speed_kt,
-            squawk: fl.squawk,
-            reg: fl.registration,
-          },
-        })),
-      };
-      if (!map.getSource("military-flights") && loaded.flights && flights.length > 0) {
-        map.addSource("military-flights", { type: "geojson", data: flightData as never });
-        map.addLayer({
-          id: "flight-circles",
-          type: "circle",
-          source: "military-flights",
-          paint: {
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 2.5, 4, 4, 8, 7],
-            "circle-color": "#00e5ff",
-            "circle-stroke-color": "#ffffff",
-            "circle-stroke-width": 0.8,
-            "circle-opacity": 0.95,
-          },
-        });
-        map.on("click", "flight-circles", (e) => {
-          const f = e.features?.[0];
-          if (!f) return;
-          showPopup(map, e.lngLat, `
-            <div class="wm-pop">
-              <span class="wm-pop-code">${f.properties?.callsign}</span> (${f.properties?.type})<br/>
-              <b>MILITARY FLIGHT</b> · SQUAWK ${f.properties?.squawk || "—"}<br/>
-              <span class="wm-pop-dim">Alt: ${f.properties?.alt ? `${f.properties?.alt} ft` : "—"} | Spd: ${f.properties?.spd ? `${f.properties?.spd} kt` : "—"}</span>
-            </div>
-          `);
-        });
-      } else if (map.getSource("military-flights")) {
-        (map.getSource("military-flights") as maplibregl.GeoJSONSource).setData(flightData as never);
-      }
-
-      // 5. Strategic Intel Sites
-      const siteFeatures = intelSites.map((s) => ({
-        type: "Feature" as const,
-        geometry: { type: "Point" as const, coordinates: [s.longitude, s.latitude] },
-        properties: { cat: s.category, name: s.name, cc: s.country_code },
-      }));
-      const siteData = { type: "FeatureCollection" as const, features: siteFeatures };
-      if (!map.getSource("intel-sites") && loaded.intel && intelSites.length > 0) {
-        map.addSource("intel-sites", { type: "geojson", data: siteData as never });
-        map.addLayer({
-          id: "intel-bases-layer",
-          type: "circle",
-          source: "intel-sites",
-          filter: ["==", ["get", "cat"], "military_base"],
-          paint: {
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 2.5, 4, 4.5, 8, 8],
-            "circle-color": "#3b82f6",
-            "circle-stroke-color": "#ffffff",
-            "circle-stroke-width": 1,
-            "circle-opacity": 0.9,
-          },
-        });
-        map.addLayer({
-          id: "intel-nuclear-layer",
-          type: "circle",
-          source: "intel-sites",
-          filter: ["==", ["get", "cat"], "nuclear_site"],
-          paint: {
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 3.5, 4, 5.5, 8, 9],
-            "circle-color": "#eab308",
-            "circle-stroke-color": "#000000",
-            "circle-stroke-width": 1.2,
-            "circle-opacity": 0.95,
-          },
-        });
-        map.addLayer({
-          id: "intel-spaceports-layer",
-          type: "circle",
-          source: "intel-sites",
-          filter: ["==", ["get", "cat"], "spaceport"],
-          paint: {
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 3, 4, 5, 8, 8],
-            "circle-color": "#a855f7",
-            "circle-stroke-color": "#ffffff",
-            "circle-stroke-width": 1,
-            "circle-opacity": 0.9,
-          },
-        });
-        const handleSiteClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
-          const f = e.features?.[0];
-          if (!f) return;
-          const catLabel = String(f.properties?.cat ?? "").replace("_", " ").toUpperCase();
-          showPopup(map, e.lngLat, `
-            <div class="wm-pop">
-              <span class="wm-pop-code">${catLabel}</span><br/>
-              <b>${f.properties?.name}</b> (${f.properties?.cc || "—"})<br/>
-              <span class="wm-pop-dim">Strategic intelligence facility</span>
-            </div>
-          `);
-        };
-        map.on("click", "intel-bases-layer", handleSiteClick);
-        map.on("click", "intel-nuclear-layer", handleSiteClick);
-        map.on("click", "intel-spaceports-layer", handleSiteClick);
-      } else if (map.getSource("intel-sites")) {
-        (map.getSource("intel-sites") as maplibregl.GeoJSONSource).setData(siteData as never);
-      }
-
-      // 6. Intel Routes (Cables & Pipelines)
-      const intelRouteFeatures = intelRoutes.map((r) => ({
-        type: "Feature" as const,
-        geometry: {
-          type: "LineString" as const,
-          coordinates: greatCircle([r.from_long, r.from_lat], [r.to_long, r.to_lat]),
-        },
-        properties: {
-          cat: r.category,
-          name: r.name,
-          fn: r.from_name,
-          tn: r.to_name,
-        },
-      }));
-      const intelRouteData = {
-        type: "FeatureCollection" as const,
-        features: intelRouteFeatures,
-      };
-      if (!map.getSource("intel-routes") && loaded.intel && intelRoutes.length > 0) {
-        map.addSource("intel-routes", { type: "geojson", data: intelRouteData as never });
-        map.addLayer({
-          id: "intel-routes-lines",
-          type: "line",
-          source: "intel-routes",
-          paint: {
-            "line-color": [
-              "match",
-              ["get", "cat"],
-              "undersea_cable", "#06b6d4",
-              "pipeline", "#f59e0b",
-              "#94a3b8",
-            ] as never,
-            "line-width": 1.5,
-            "line-dasharray": [3, 2],
-            "line-opacity": 0.75,
-          },
-        });
-        map.on("click", "intel-routes-lines", (e) => {
-          const f = e.features?.[0];
-          if (!f) return;
-          const catLabel = String(f.properties?.cat ?? "").replace("_", " ").toUpperCase();
-          showPopup(map, e.lngLat, `
-            <div class="wm-pop">
-              <span class="wm-pop-code">${catLabel}</span><br/>
-              <b>${f.properties?.name}</b><br/>
-              <span class="wm-pop-dim">${f.properties?.fn} ⇄ ${f.properties?.tn}</span>
-            </div>
-          `);
-        });
-      } else if (map.getSource("intel-routes")) {
-        (map.getSource("intel-routes") as maplibregl.GeoJSONSource).setData(intelRouteData as never);
-      }
-
-      // 7. Strategic Maritime Chokepoints (WebGL Native Layer with 3D Globe Depth Occlusion)
-      const chokeData = {
-        type: "FeatureCollection" as const,
-        features: chokepoints.map((cp) => {
-          const color =
-            cp.status === "critical"
-              ? "#ef4444"
-              : cp.status === "elevated"
-              ? "#f97316"
-              : cp.status === "watch"
-              ? "#eab308"
-              : "#22c55e";
-          return {
-            type: "Feature" as const,
-            geometry: { type: "Point" as const, coordinates: [cp.long, cp.lat] },
-            properties: {
-              code: cp.code,
-              name: cp.name,
-              status: cp.status,
-              score: cp.disruption_score,
-              oil: cp.baseline_mbd ?? 0,
-              reason: cp.last_disruption_reason ?? "",
-              color,
+        if (!map.getSource("chokepoint-points") && loaded.chokes && chokepoints.length > 0) {
+          map.addSource("chokepoint-points", { type: "geojson", data: chokeData as never });
+          map.addLayer({
+            id: "choke-pulse-glow",
+            type: "circle",
+            source: "chokepoint-points",
+            paint: {
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 6, 4, 10, 8, 16],
+              "circle-color": ["get", "color"],
+              "circle-opacity": 0.45,
+              "circle-blur": 0.45,
             },
+          });
+          map.addLayer({
+            id: "choke-circles",
+            type: "circle",
+            source: "chokepoint-points",
+            paint: {
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 3.2, 4, 5, 8, 8],
+              "circle-color": "#ffffff",
+              "circle-stroke-color": ["get", "color"],
+              "circle-stroke-width": 2,
+              "circle-opacity": 1.0,
+            },
+          });
+          map.addLayer({
+            id: "choke-labels",
+            type: "symbol",
+            source: "chokepoint-points",
+            layout: {
+              "text-field": ["get", "name"],
+              "text-size": ["interpolate", ["linear"], ["zoom"], 1, 9, 4, 11, 8, 13],
+              "text-offset": [0, 1.2],
+              "text-anchor": "top",
+              "text-allow-overlap": false,
+              "text-ignore-placement": false,
+            },
+            paint: {
+              "text-color": "#f8fafc",
+              "text-halo-color": "#020617",
+              "text-halo-width": 1.5,
+            },
+          });
+          const handleChokeClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
+            const f = e.features?.[0];
+            if (!f) return;
+            showPopup(
+              map,
+              e.lngLat,
+              `<div class="wm-pop"><span class="wm-pop-code">${f.properties?.name}</span> (${f.properties?.code})<br/>Disruption: <b>${Number(f.properties?.score).toFixed(0)}</b>/100 [${String(f.properties?.status || "").toUpperCase()}]<br/><span class="wm-pop-dim">Baseline: ${f.properties?.oil} MBD ${f.properties?.reason ? `| ${f.properties?.reason}` : ""}</span></div>`
+            );
           };
-        }),
-      };
-      if (!map.getSource("chokepoint-points") && loaded.chokes && chokepoints.length > 0) {
-        map.addSource("chokepoint-points", { type: "geojson", data: chokeData as never });
-        map.addLayer({
-          id: "choke-pulse-glow",
-          type: "circle",
-          source: "chokepoint-points",
-          paint: {
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 6, 4, 10, 8, 16],
-            "circle-color": ["get", "color"],
-            "circle-opacity": 0.45,
-            "circle-blur": 0.45,
-          },
-        });
-        map.addLayer({
-          id: "choke-circles",
-          type: "circle",
-          source: "chokepoint-points",
-          paint: {
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 3.2, 4, 5, 8, 8],
-            "circle-color": "#ffffff",
-            "circle-stroke-color": ["get", "color"],
-            "circle-stroke-width": 2,
-            "circle-opacity": 1.0,
-          },
-        });
-        map.addLayer({
-          id: "choke-labels",
-          type: "symbol",
-          source: "chokepoint-points",
-          layout: {
-            "text-field": ["get", "name"],
-            "text-size": ["interpolate", ["linear"], ["zoom"], 1, 9, 4, 11, 8, 13],
-            "text-offset": [0, 1.2],
-            "text-anchor": "top",
-            "text-allow-overlap": false,
-            "text-ignore-placement": false,
-          },
-          paint: {
-            "text-color": "#f8fafc",
-            "text-halo-color": "#020617",
-            "text-halo-width": 1.5,
-          },
-        });
-        const handleChokeClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
-          const f = e.features?.[0];
-          if (!f) return;
-          showPopup(
-            map,
-            e.lngLat,
-            `<div class="wm-pop"><span class="wm-pop-code">${f.properties?.name}</span> (${f.properties?.code})<br/>Disruption: <b>${Number(f.properties?.score).toFixed(0)}</b>/100 [${String(f.properties?.status || "").toUpperCase()}]<br/><span class="wm-pop-dim">Baseline: ${f.properties?.oil} MBD ${f.properties?.reason ? `| ${f.properties?.reason}` : ""}</span></div>`
-          );
-        };
-        map.on("click", "choke-circles", handleChokeClick);
-        map.on("click", "choke-labels", handleChokeClick);
-      } else if (map.getSource("chokepoint-points")) {
-        (map.getSource("chokepoint-points") as maplibregl.GeoJSONSource).setData(chokeData as never);
-      }
+          map.on("click", "choke-circles", handleChokeClick);
+          map.on("click", "choke-labels", handleChokeClick);
+        } else if (map.getSource("chokepoint-points")) {
+          (map.getSource("chokepoint-points") as maplibregl.GeoJSONSource).setData(chokeData as never);
+        }
 
-      // Visibility toggles
-      const vis = (name: string, on: boolean) => {
-        if (map.getLayer(name)) map.setLayoutProperty(name, "visibility", on ? "visible" : "none");
-      };
-      vis("cii-fill", layers.cii);
-      vis("cii-line", layers.cii);
-      vis("quake-circles", layers.quakes);
-      vis("protest-circles", layers.protests);
-      vis("route-lines-base", layers.routes);
-      vis("route-lines-glow", layers.routes);
-      vis("route-lines-active", layers.routes);
-      vis("flight-circles", layers.flights);
-      vis("intel-bases-layer", layers.bases);
-      vis("intel-nuclear-layer", layers.nuclear);
-      vis("intel-spaceports-layer", layers.spaceports);
-      vis("intel-routes-lines", layers.cables);
-      vis("choke-pulse-glow", layers.chokes);
-      vis("choke-circles", layers.chokes);
-      vis("choke-labels", layers.chokes);
+        // Visibility toggles
+        const vis = (name: string, on: boolean) => {
+          if (map.getLayer(name)) map.setLayoutProperty(name, "visibility", on ? "visible" : "none");
+        };
+        vis("cii-fill", layers.cii);
+        vis("cii-line", layers.cii);
+        vis("quake-circles", layers.quakes);
+        vis("protest-circles", layers.protests);
+        vis("route-lines-base", layers.routes);
+        vis("route-lines-glow", layers.routes);
+        vis("route-lines-active", layers.routes);
+        vis("flight-circles", layers.flights);
+        vis("intel-bases-layer", layers.bases);
+        vis("intel-nuclear-layer", layers.nuclear);
+        vis("intel-spaceports-layer", layers.spaceports);
+        vis("intel-routes-lines", layers.cables);
+        vis("choke-pulse-glow", layers.chokes);
+        vis("choke-circles", layers.chokes);
+        vis("choke-labels", layers.chokes);
+      } catch (err) {
+        console.warn("Error applying layers:", err);
+      }
     };
-    apply();
+
+    if (map.isStyleLoaded()) {
+      apply();
+    } else {
+      map.once("load", apply);
+    }
   }, [layers, quakes, protests, routes, flights, chokepoints, intelSites, intelRoutes, loaded, mapTheme]);
 
   // 5. Moving Commodity Transport Lines Animation (Gliding back-and-forth at staggered intervals)
@@ -617,39 +642,45 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
     const animateLines = (now: number) => {
       if (now - lastRenderTime >= 24) {
         lastRenderTime = now;
-        const source = map.getSource("trade-routes-active") as maplibregl.GeoJSONSource | undefined;
-        if (source && map.getLayer("route-lines-active")) {
-          const features: GeoJSON.Feature[] = [];
-          for (const track of animatedTracks) {
-            const N = track.path.length;
-            if (N < 4) continue;
+        try {
+          if (map.isStyleLoaded() && map.getLayer("route-lines-active")) {
+            const source = map.getSource("trade-routes-active") as maplibregl.GeoJSONSource | undefined;
+            if (source) {
+              const features: GeoJSON.Feature[] = [];
+              for (const track of animatedTracks) {
+                const N = track.path.length;
+                if (N < 4) continue;
 
-            const angle = (2 * Math.PI * (now + track.phaseOffset)) / track.durationMs;
-            const progress = 0.5 * (1 - Math.cos(angle));
+                const angle = (2 * Math.PI * (now + track.phaseOffset)) / track.durationMs;
+                const progress = 0.5 * (1 - Math.cos(angle));
 
-            const segLen = Math.max(6, Math.round(N * 0.35));
-            const maxStart = N - segLen;
-            const startIdx = Math.round(progress * maxStart);
-            const endIdx = Math.min(N, startIdx + segLen);
+                const segLen = Math.max(6, Math.round(N * 0.35));
+                const maxStart = N - segLen;
+                const startIdx = Math.round(progress * maxStart);
+                const endIdx = Math.min(N, startIdx + segLen);
 
-            const segmentCoords = track.path.slice(startIdx, endIdx);
-            if (segmentCoords.length >= 2) {
-              features.push({
-                type: "Feature",
-                geometry: {
-                  type: "LineString",
-                  coordinates: segmentCoords,
-                },
-                properties: {
-                  commodity: track.commodity,
-                  partner: track.partner,
-                  risk: track.risk,
-                  color: track.color,
-                },
-              });
+                const segmentCoords = track.path.slice(startIdx, endIdx);
+                if (segmentCoords.length >= 2) {
+                  features.push({
+                    type: "Feature",
+                    geometry: {
+                      type: "LineString",
+                      coordinates: segmentCoords,
+                    },
+                    properties: {
+                      commodity: track.commodity,
+                      partner: track.partner,
+                      risk: track.risk,
+                      color: track.color,
+                    },
+                  });
+                }
+              }
+              source.setData({ type: "FeatureCollection", features } as never);
             }
           }
-          source.setData({ type: "FeatureCollection", features } as never);
+        } catch (err) {
+          // silently handle during unmount
         }
       }
       animId = requestAnimationFrame(animateLines);
@@ -682,75 +713,81 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
       });
 
     const addBoundaries = () => {
-      if (!map.getSource("countries")) {
-        map.addSource("countries", {
-          type: "geojson",
-          data: { type: "FeatureCollection", features } as never,
-        });
-        map.addLayer({
-          id: "cii-fill",
-          type: "fill",
-          source: "countries",
-          paint: {
-            "fill-color": [
-              "case",
-              ["<=", ["get", "__cii"], 0],
-              "transparent",
-              [
-                "interpolate",
-                ["linear"],
-                ["get", "__cii"],
-                10,
-                "rgba(58,21,32,0.3)",
-                30,
-                "rgba(138,26,26,0.45)",
-                50,
-                "rgba(194,37,37,0.55)",
-                70,
-                "rgba(255,64,48,0.65)",
-                90,
-                "rgba(255,122,92,0.75)",
-              ],
-            ] as never,
-            "fill-opacity": 0.8,
-          },
-        });
-        map.addLayer({
-          id: "cii-line",
-          type: "line",
-          source: "countries",
-          paint: {
-            "line-color": mapTheme === "satellite" ? "rgba(56, 189, 248, 0.45)" : "#3a3f52",
-            "line-width": 0.75,
-          },
-        });
+      if (!map || !map.isStyleLoaded()) return;
 
-        map.on("mousemove", "cii-fill", (e) => {
-          const f = e.features?.[0];
-          if (!f) return;
-          map.getCanvas().style.cursor = "crosshair";
-          const code = f.properties?.iso_a3 as string;
-          const score = ciiScores.get(code);
-          showPopup(
-            map,
-            e.lngLat,
-            `<div class="wm-pop"><span class="wm-pop-code">${code}</span><br/>CII <b>${
-              score !== undefined ? score.toFixed(1) : "—"
-            }</b>/100</div>`
-          );
-        });
-        map.on("mouseleave", "cii-fill", () => {
-          map.getCanvas().style.cursor = "";
-        });
-      } else {
-        (map.getSource("countries") as maplibregl.GeoJSONSource).setData({
-          type: "FeatureCollection",
-          features,
-        } as never);
+      try {
+        if (!map.getSource("countries")) {
+          map.addSource("countries", {
+            type: "geojson",
+            data: { type: "FeatureCollection", features } as never,
+          });
+          map.addLayer({
+            id: "cii-fill",
+            type: "fill",
+            source: "countries",
+            paint: {
+              "fill-color": [
+                "case",
+                ["<=", ["get", "__cii"], 0],
+                "transparent",
+                [
+                  "interpolate",
+                  ["linear"],
+                  ["get", "__cii"],
+                  10,
+                  "rgba(58,21,32,0.3)",
+                  30,
+                  "rgba(138,26,26,0.45)",
+                  50,
+                  "rgba(194,37,37,0.55)",
+                  70,
+                  "rgba(255,64,48,0.65)",
+                  90,
+                  "rgba(255,122,92,0.75)",
+                ],
+              ] as never,
+              "fill-opacity": 0.8,
+            },
+          });
+          map.addLayer({
+            id: "cii-line",
+            type: "line",
+            source: "countries",
+            paint: {
+              "line-color": mapTheme === "satellite" ? "rgba(56, 189, 248, 0.45)" : "#3a3f52",
+              "line-width": 0.75,
+            },
+          });
+
+          map.on("mousemove", "cii-fill", (e) => {
+            const f = e.features?.[0];
+            if (!f) return;
+            map.getCanvas().style.cursor = "crosshair";
+            const code = f.properties?.iso_a3 as string;
+            const score = ciiScores.get(code);
+            showPopup(
+              map,
+              e.lngLat,
+              `<div class="wm-pop"><span class="wm-pop-code">${code}</span><br/>CII <b>${
+                score !== undefined ? score.toFixed(1) : "—"
+              }</b>/100</div>`
+            );
+          });
+          map.on("mouseleave", "cii-fill", () => {
+            map.getCanvas().style.cursor = "";
+          });
+        } else {
+          (map.getSource("countries") as maplibregl.GeoJSONSource).setData({
+            type: "FeatureCollection",
+            features,
+          } as never);
+        }
+      } catch (err) {
+        console.warn("Boundaries layer error:", err);
       }
     };
 
-    if (map.loaded()) {
+    if (map.isStyleLoaded()) {
       addBoundaries();
     } else {
       map.once("load", addBoundaries);
@@ -759,7 +796,7 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
 
   return (
     <div className="map-zone">
-      <div id="globe" />
+      <div id="globe" ref={mapContainerRef} />
       <div className="globe-atmosphere-glow" />
 
       <div className="map-overlays">

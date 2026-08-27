@@ -1,4 +1,24 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import type {
+  FeedItem,
+  CascadePair,
+  Headline,
+  GovernmentAction,
+  Commodity,
+  Freight,
+  Quake,
+  Prediction,
+  Protest,
+  Chokepoint,
+  TradeRoute,
+  AggressionPair,
+  Flight,
+  IntelSite,
+  IntelRoute,
+  WorldBrief,
+  CiiScore,
+  Alert,
+} from '../types';
 
 async function api<T>(path: string): Promise<T> {
   const res = await fetch(path);
@@ -120,5 +140,3 @@ export function useAlerts() {
     staleTime: 5000,
   });
 }
-
-import type { FeedItem, CascadePair, Headline, GovernmentAction, Commodity, Freight, Quake, Prediction, Protest, Chokepoint, TradeRoute, AggressionPair, Flight, IntelSite, IntelRoute, WorldBrief, CiiScore, Alert } from '../types';

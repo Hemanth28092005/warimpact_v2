@@ -178,11 +178,49 @@ function WarMonitorApp(): JSX.Element {
   );
 }
 
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("WarMonitor uncaught component error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: "40px 20px", color: "#ff6b6b", background: "#010308", fontFamily: "monospace", minHeight: "100vh" }}>
+          <h2>SYSTEM DISPLAY EXCEPTION</h2>
+          <p>{this.state.error?.message}</p>
+          <button
+            style={{ padding: "8px 16px", background: "#22d3ee", color: "#000", border: "none", cursor: "pointer", fontWeight: 700, marginTop: "16px" }}
+            onClick={() => {
+              localStorage.clear();
+              window.location.reload();
+            }}
+          >
+            RESET LOCAL STATE & RELOAD
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <WarMonitorApp />
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <WarMonitorApp />
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

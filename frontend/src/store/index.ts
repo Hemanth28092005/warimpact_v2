@@ -120,14 +120,27 @@ export const useUIStore = create<UIState>()(
       setShowTv: (v) => set({ showTv: v }),
       setTvChannel: (c) => set({ tvChannel: c }),
       setTvMinimized: (v) => set({ tvMinimized: v }),
-      toggleLayer: (k) => set((s) => ({ layers: { ...s.layers, [k]: !s.layers[k] } })),
-      setLoaded: (k, v) => set((s) => ({ loaded: { ...s.loaded, [k]: v } })),
+      toggleLayer: (k) =>
+        set((s) => ({
+          layers: { ...(s.layers || defaultLayers), [k]: !(s.layers || defaultLayers)[k] },
+        })),
+      setLoaded: (k, v) =>
+        set((s) => ({ loaded: { ...(s.loaded || defaultLoaded), [k]: v } })),
       addAlert: (alert) =>
         set((s) => ({
-          alerts: [alert, ...s.alerts.slice(0, s.maxAlerts - 1)],
+          alerts: [alert, ...(s.alerts || []).slice(0, (s.maxAlerts || 50) - 1)],
         })),
       clearAlerts: () => set({ alerts: [] }),
     }),
-    { name: 'war-monitor-ui' }
+    {
+      name: "war-monitor-ui-v2",
+      partialize: (state) => ({
+        view3d: state.view3d,
+        mapTheme: state.mapTheme,
+        region: state.region,
+        windowH: state.windowH,
+        layers: state.layers,
+      }),
+    }
   )
 );
