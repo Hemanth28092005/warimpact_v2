@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes.aggression import router as aggression_router
+from api.routes.alerts import router as alerts_router
 from api.routes.brief import router as brief_router
 from api.routes.cascade import cascade_router
 from api.routes.cii import router as cii_router
@@ -38,6 +39,7 @@ app.include_router(dashboard_router)
 app.include_router(markets_router)
 app.include_router(events_router)
 app.include_router(brief_router)
+app.include_router(alerts_router)
 app.include_router(health_router)
 
 
