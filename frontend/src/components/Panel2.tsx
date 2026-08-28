@@ -36,7 +36,7 @@ export function Panel2({ scoresArr, chokepoints, aggression, cascade, routes }: 
       <div className="bp-list">
         {p2 === 'cii' && (
           <>
-            {scoresArr.slice(0, 14).map(([code, score]) => (
+            {scoresArr.filter(([code]) => code !== 'IND').slice(0, 14).map(([code, score]) => (
               <div key={code} className="row">
                 <span className={`sev-tag ${score >= 70 ? 'crit' : score >= 50 ? 'high' : score >= 30 ? 'mid' : 'pos'}`}>{score.toFixed(0)}</span>
                 <span className="row-main">
@@ -45,7 +45,7 @@ export function Panel2({ scoresArr, chokepoints, aggression, cascade, routes }: 
                 </span>
               </div>
             ))}
-            {scoresArr.length === 0 && <div className="empty">// awaiting CII scores</div>}
+            {scoresArr.filter(([code]) => code !== 'IND').length === 0 && <div className="empty">// awaiting CII scores</div>}
           </>
         )}
 

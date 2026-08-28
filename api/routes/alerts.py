@@ -90,7 +90,7 @@ async def get_recent_alerts(
                 SELECT DISTINCT ON (country_code)
                     country_code, cii_score, computed_at
                 FROM country_instability_index
-                WHERE cii_score >= 60
+                WHERE cii_score >= 60 AND country_code <> 'IND'
                 ORDER BY country_code, score_date DESC;
                 """
             )

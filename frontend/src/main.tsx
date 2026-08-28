@@ -89,7 +89,11 @@ function WarMonitorApp(): JSX.Element {
   const ciiScores = useMemo(() => {
     const map = new Map<string, number>();
     if (ciiScoresData) {
-      ciiScoresData.forEach((s) => map.set(s.country_code, s.cii_score));
+      ciiScoresData.forEach((s) => {
+        if (s.country_code !== "IND") {
+          map.set(s.country_code, s.cii_score);
+        }
+      });
     }
     return map;
   }, [ciiScoresData]);

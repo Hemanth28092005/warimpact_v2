@@ -36,6 +36,7 @@ async def _gather_signals() -> dict[str, Any]:
                 """
                 SELECT country_code, cii_score FROM country_instability_index
                 WHERE score_date = (SELECT MAX(score_date) FROM country_instability_index)
+                  AND country_code <> 'IND'
                 ORDER BY cii_score DESC LIMIT 5
                 """
             )
