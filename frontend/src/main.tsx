@@ -103,9 +103,9 @@ function WarMonitorApp(): JSX.Element {
 
   const topAggression = useMemo(() => {
     return aggression
-      .filter((p) => p.aggression_score !== null && p.data_source === "gdelt_derived")
-      .sort((a, b) => (b.aggression_score ?? 0) - (a.aggression_score ?? 0))
-      .slice(0, 14);
+      .filter((p) => p.event_count !== null && p.data_source === "gdelt_derived")
+      .sort((a, b) => (b.event_count ?? 0) - (a.event_count ?? 0))
+      .slice(0, 10);
   }, [aggression]);
 
   const topRoutes = useMemo(() => {
