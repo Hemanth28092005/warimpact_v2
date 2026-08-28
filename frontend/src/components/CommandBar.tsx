@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useUIStore } from '../store';
 import type { Region } from '../types';
+import { INDIAN_PORTS } from '../utils/geo';
 
 interface CommandBarProps {
   defconLevel: number;
@@ -9,7 +10,17 @@ interface CommandBarProps {
 
 export function CommandBar({ defconLevel, clock: propClock }: CommandBarProps) {
   const [internalClock, setInternalClock] = useState<string>('');
-  const { region, setRegion, showBrief, setShowBrief, showTv, setShowTv, mapTheme, setMapTheme, view3d, setView3d, autoRotate, setAutoRotate, windowH, setWindowH } = useUIStore();
+  const {
+    region,
+    setRegion,
+    showBrief,
+    setShowBrief,
+    showTv,
+    setShowTv,
+    selectedPort,
+    setSelectedPort,
+    mapRef,
+  } = useUIStore();
 
   useEffect(() => {
     const tick = () => {
@@ -43,6 +54,36 @@ export function CommandBar({ defconLevel, clock: propClock }: CommandBarProps) {
         <select className="cmd-select" value={region} onChange={(e) => setRegion(e.target.value as Region)}>
           {['usa', 'europe', 'middle_east', 'india'].map((r) => (
             <option key={r} value={r}>{r.replace('_', ' ').toUpperCase()}</option>
+          ))}
+        </select>
+        <select
+          className="cmd-select port-select-header"
+          value={selectedPort}
+          onChange={(e) => {
+            const pCode = e.target.value;
+            setSelectedPort(pCode);
+            if (pCode !== 'ALL') {
+              const portObj = INDIAN_PORTS.find((p) => p.code === pCode);
+              if (portObj && mapRef) {
+                mapRef.flyTo({ center: [portObj.long, portObj.lat], zoom: 5.2, pitch: 35 });
+              }
+            } else if (mapRef) {
+              mapRef.flyTo({ center: [78.9629, 20.5937], zoom: 3.5, pitch: 20 });
+            }
+          }}
+          style={{
+            background: selectedPort !== 'ALL' ? '#0284c7' : '#0a152e',
+            borderColor: selectedPort !== 'ALL' ? '#38bdf8' : '#1e3a8a',
+            color: '#f8fafc',
+            fontWeight: 600,
+          }}
+          title="Filter Trade Routes by Port"
+        >
+          <option value="ALL">⚓ PORT: ALL PORTS</option>
+          {INDIAN_PORTS.map((p) => (
+            <option key={p.code} value={p.code}>
+              ⚓ {p.name.replace(' Port', '')} ({p.state})
+            </option>
           ))}
         </select>
         <span className={`defcon-badge dc-${defconLevel}`}>⚠ DEFCON {defconLevel}</span>

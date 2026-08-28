@@ -103,6 +103,7 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
     layers,
     toggleLayer,
     selectedPort,
+    setSelectedPort,
   } = useUIStore();
 
   // 1. Initialize Map directly on DOM ref
@@ -959,6 +960,92 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
               {h === 168 ? "7d" : `${h}h`}
             </button>
           ))}
+        </div>
+
+        {/* Floating Port Selector on Globe */}
+        <div
+          className="globe-port-selector"
+          style={{
+            position: "absolute",
+            top: "14px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 30,
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            background: "rgba(3, 7, 18, 0.90)",
+            backdropFilter: "blur(12px)",
+            border: "1px solid rgba(56, 189, 248, 0.4)",
+            boxShadow: "0 4px 24px rgba(0, 0, 0, 0.7), 0 0 12px rgba(56, 189, 248, 0.2)",
+            padding: "5px 12px",
+            borderRadius: "8px",
+            pointerEvents: "auto",
+          }}
+        >
+          <span style={{ fontSize: "11px", fontWeight: 700, color: "#38bdf8", letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: "5px", whiteSpace: "nowrap" }}>
+            ⚓ PORT GATEWAY:
+          </span>
+          <select
+            value={selectedPort}
+            onChange={(e) => {
+              const pCode = e.target.value;
+              setSelectedPort(pCode);
+              const map = mapRef.current;
+              if (pCode !== "ALL") {
+                const portObj = INDIAN_PORTS.find((p) => p.code === pCode);
+                if (portObj && map) {
+                  map.flyTo({ center: [portObj.long, portObj.lat], zoom: 5.2, pitch: 35 });
+                }
+              } else if (map) {
+                map.flyTo({ center: [78.9629, 20.5937], zoom: 3.5, pitch: 20 });
+              }
+            }}
+            style={{
+              padding: "4px 10px",
+              fontSize: "12px",
+              fontWeight: 600,
+              background: selectedPort !== "ALL" ? "#0369a1" : "#081226",
+              border: "1px solid #0284c7",
+              color: "#ffffff",
+              borderRadius: "5px",
+              cursor: "pointer",
+              outline: "none",
+            }}
+          >
+            <option value="ALL">🌐 ALL INDIAN PORTS (91 ROUTES)</option>
+            {INDIAN_PORTS.map((p) => {
+              const count = routes.filter((r) => getIndiaPortCode(r.dest_lat, r.dest_long) === p.code).length;
+              return (
+                <option key={p.code} value={p.code}>
+                  ⚓ {p.name} ({count} routes · {p.state})
+                </option>
+              );
+            })}
+          </select>
+          {selectedPort !== "ALL" && (
+            <button
+              onClick={() => {
+                setSelectedPort("ALL");
+                const map = mapRef.current;
+                if (map) map.flyTo({ center: [78.9629, 20.5937], zoom: 3.5, pitch: 20 });
+              }}
+              style={{
+                background: "rgba(239, 68, 68, 0.25)",
+                border: "1px solid #ef4444",
+                color: "#fca5a5",
+                fontSize: "11px",
+                padding: "3px 8px",
+                borderRadius: "4px",
+                cursor: "pointer",
+                fontWeight: 600,
+                whiteSpace: "nowrap",
+              }}
+              title="Reset filter to all ports"
+            >
+              ✕ RESET
+            </button>
+          )}
         </div>
 
         <div className="layers-panel">
