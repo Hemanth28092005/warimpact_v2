@@ -1,24 +1,27 @@
-import React, { useState, useEffect } from "react";
-import { useUIStore } from "../store";
-import { REGIONS, Region } from "../types";
+import { useState, useEffect } from 'react';
+import { useUIStore } from '../store';
+import type { Region } from '../types';
 
 interface CommandBarProps {
   defconLevel: number;
+  clock?: string;
 }
 
-export const CommandBar: React.FC<CommandBarProps> = ({ defconLevel }) => {
-  const { region, setRegion, showBrief, setShowBrief, showTv, setShowTv } = useUIStore();
-  const [clock, setClock] = useState<string>("");
+export function CommandBar({ defconLevel, clock: propClock }: CommandBarProps) {
+  const [internalClock, setInternalClock] = useState<string>('');
+  const { region, setRegion, showBrief, setShowBrief, showTv, setShowTv, mapTheme, setMapTheme, view3d, setView3d, autoRotate, setAutoRotate, windowH, setWindowH } = useUIStore();
 
   useEffect(() => {
     const tick = () => {
       const now = new Date();
-      setClock(now.toUTCString().replace("GMT", "UTC"));
+      setInternalClock(now.toUTCString().replace('GMT', 'UTC'));
     };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, []);
+
+  const clock = propClock || internalClock;
 
   return (
     <header className="cmdbar">
@@ -30,31 +33,16 @@ export const CommandBar: React.FC<CommandBarProps> = ({ defconLevel }) => {
         <span className="cmd-ver">v0.4.0</span>
       </div>
       <div className="cmd-right">
-        <button
-          className={`cmd-btn brief-btn ${showBrief ? "active" : ""}`}
-          onClick={() => setShowBrief(true)}
-        >
+        <button className={`cmd-btn brief-btn ${showBrief ? 'active' : ''}`} onClick={() => setShowBrief(true)}>
           <span className="brief-spark">✦</span> AI BRIEF
         </button>
-        <button
-          className={`cmd-btn tv-btn ${showTv ? "active" : ""}`}
-          onClick={() => setShowTv(!showTv)}
-        >
+        <button className={`cmd-btn tv-btn ${showTv ? 'active' : ''}`} onClick={() => setShowTv(!showTv)}>
           <span className="tv-icon">📺</span> LIVE TV
         </button>
-        <span className="live-ind">
-          <i />
-          LIVE
-        </span>
-        <select
-          className="cmd-select"
-          value={region}
-          onChange={(e) => setRegion(e.target.value as Region)}
-        >
-          {REGIONS.map((r) => (
-            <option key={r} value={r}>
-              {r.replace("_", " ").toUpperCase()}
-            </option>
+        <span className="live-ind"><i />LIVE</span>
+        <select className="cmd-select" value={region} onChange={(e) => setRegion(e.target.value as Region)}>
+          {['usa', 'europe', 'middle_east', 'india'].map((r) => (
+            <option key={r} value={r}>{r.replace('_', ' ').toUpperCase()}</option>
           ))}
         </select>
         <span className={`defcon-badge dc-${defconLevel}`}>⚠ DEFCON {defconLevel}</span>
@@ -62,4 +50,4 @@ export const CommandBar: React.FC<CommandBarProps> = ({ defconLevel }) => {
       </div>
     </header>
   );
-};
+}

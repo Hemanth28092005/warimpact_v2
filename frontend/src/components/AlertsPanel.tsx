@@ -1,71 +1,33 @@
-import React, { useState } from "react";
-import { Alert } from "../types";
-import { timeAgo } from "../utils/formatters";
+import { useUIStore } from '../store';
+import type { Alert } from '../types';
 
-interface AlertsPanelProps {
-  alerts: Alert[];
-  onClose?: () => void;
-}
+export function AlertsPanel() {
+  const { alerts, clearAlerts } = useUIStore();
 
-export const AlertsPanel: React.FC<AlertsPanelProps> = ({ alerts, onClose }) => {
-  const [filter, setFilter] = useState<"all" | "critical" | "warning">("all");
-
-  const filteredAlerts = alerts.filter((a) => {
-    if (filter === "all") return true;
-    return a.level === filter;
-  });
+  if (alerts.length === 0) return null;
 
   return (
-    <div className="alerts-modal">
-      <div className="alerts-head">
-        <div className="alerts-title-block">
-          <span className="alerts-dot" />
-          <span className="alerts-title">SYSTEMIC RISK & CRISIS ALERTS</span>
-          <span className="alerts-count">({filteredAlerts.length})</span>
-        </div>
-        <div className="alerts-filters">
-          <button
-            className={`af-btn ${filter === "all" ? "active" : ""}`}
-            onClick={() => setFilter("all")}
-          >
-            ALL
-          </button>
-          <button
-            className={`af-btn crit ${filter === "critical" ? "active" : ""}`}
-            onClick={() => setFilter("critical")}
-          >
-            CRITICAL
-          </button>
-          <button
-            className={`af-btn warn ${filter === "warning" ? "active" : ""}`}
-            onClick={() => setFilter("warning")}
-          >
-            WARNING
-          </button>
-          {onClose && (
-            <button className="af-close" onClick={onClose}>
-              ✕
-            </button>
-          )}
-        </div>
+    <div className="alerts-panel">
+      <div className="alerts-header">
+        <span className="alerts-title">⚠ LIVE ALERTS</span>
+        <button className="alerts-clear" onClick={clearAlerts}>CLEAR</button>
       </div>
-
       <div className="alerts-list">
-        {filteredAlerts.length === 0 ? (
-          <div className="alerts-empty">No active alerts for current filter criteria.</div>
-        ) : (
-          filteredAlerts.map((a) => (
-            <div key={a.id} className={`alert-card lvl-${a.level}`}>
-              <div className="ac-top">
-                <span className={`ac-tag lvl-${a.level}`}>{a.type.toUpperCase()}</span>
-                <span className="ac-entity">{a.entity}</span>
-                <span className="ac-time">{timeAgo(a.timestamp)}</span>
-              </div>
-              <div className="ac-msg">{a.message}</div>
+        {alerts.slice(0, 8).map((alert: Alert) => (
+          <div key={alert.id} className={`alert-item alert-${alert.level}`}>
+            <span className="alert-dot" />
+            <div className="alert-content">
+              <span className="alert-message">{alert.message}</span>
+              <span className="alert-meta">
+                {alert.entity} · {alert.type.toUpperCase()} · {new Date(alert.timestamp).toLocaleTimeString()}
+              </span>
             </div>
-          ))
-        )}
+            <span className={`alert-badge alert-${alert.level}`}>
+              {alert.level.toUpperCase()}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
-};
+}

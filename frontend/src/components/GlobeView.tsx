@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 import { useUIStore } from "../store";
 import {
   WINDOWS_H,
@@ -14,16 +15,16 @@ import {
 import { greatCircle, showPopup } from "../utils/geo";
 
 interface GlobeViewProps {
-  boundariesData: { iso_a3: string; geojson: object }[];
-  ciiScores: Map<string, number>;
-  quakes: Quake[];
-  protests: Protest[];
-  chokepoints: Chokepoint[];
-  routes: TradeRoute[];
-  flights: Flight[];
-  intelSites: IntelSite[];
-  intelRoutes: IntelRoute[];
-  loaded: {
+  boundariesData?: { iso_a3: string; geojson: object }[];
+  ciiScores?: Map<string, number>;
+  quakes?: Quake[];
+  protests?: Protest[];
+  chokepoints?: Chokepoint[];
+  routes?: TradeRoute[];
+  flights?: Flight[];
+  intelSites?: IntelSite[];
+  intelRoutes?: IntelRoute[];
+  loaded?: {
     cii: boolean;
     quakes: boolean;
     chokes: boolean;
@@ -71,16 +72,24 @@ const REALISTIC_SATELLITE_STYLE: maplibregl.StyleSpecification = {
 const DARK_TACTICAL_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 
 export const GlobeView: React.FC<GlobeViewProps> = ({
-  boundariesData,
-  ciiScores,
-  quakes,
-  protests,
-  chokepoints,
-  routes,
-  flights,
-  intelSites,
-  intelRoutes,
-  loaded,
+  boundariesData = [],
+  ciiScores = new Map(),
+  quakes = [],
+  protests = [],
+  chokepoints = [],
+  routes = [],
+  flights = [],
+  intelSites = [],
+  intelRoutes = [],
+  loaded = {
+    cii: true,
+    quakes: true,
+    chokes: true,
+    protests: true,
+    routes: true,
+    flights: true,
+    intel: true,
+  },
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -94,7 +103,7 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
     toggleLayer,
   } = useUIStore();
 
-  // 1. Initialize Map
+  // 1. Initialize Map directly on DOM ref
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
@@ -130,11 +139,18 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
   // 2. View 3D Projection update
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-    try {
-      map.setProjection({ type: view3d ? "globe" : "mercator" });
-    } catch (err) {
-      console.warn("Projection update error:", err);
+    if (!map) return;
+    const updateProj = () => {
+      try {
+        map.setProjection({ type: view3d ? "globe" : "mercator" });
+      } catch (err) {
+        console.warn("Projection update error:", err);
+      }
+    };
+    if (map.isStyleLoaded()) {
+      updateProj();
+    } else {
+      map.once("style.load", updateProj);
     }
   }, [view3d]);
 
@@ -170,7 +186,7 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
     };
   }, [view3d, autoRotate]);
 
-  // 4. Render & Update all Dynamic Layers safely after style load
+  // 4. Render & Update all Dynamic Layers
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -188,7 +204,7 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
             properties: { mag: q.magnitude, place: q.place ?? "", id: q.external_id },
           })),
         };
-        if (!map.getSource("quakes") && loaded.quakes) {
+        if (!map.getSource("quakes") && loaded.quakes && quakes.length > 0) {
           map.addSource("quakes", { type: "geojson", data: quakeData as never });
           map.addLayer({
             id: "quake-circles",
@@ -232,7 +248,7 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
             },
           })),
         };
-        if (!map.getSource("protests") && loaded.protests) {
+        if (!map.getSource("protests") && loaded.protests && protests.length > 0) {
           map.addSource("protests", { type: "geojson", data: protestData as never });
           map.addLayer({
             id: "protest-circles",
@@ -614,7 +630,7 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
     }
   }, [layers, quakes, protests, routes, flights, chokepoints, intelSites, intelRoutes, loaded, mapTheme]);
 
-  // 5. Moving Commodity Transport Lines Animation (Gliding back-and-forth at staggered intervals)
+  // 5. Moving Commodity Transport Lines Animation
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !loaded.routes || routes.length === 0 || !layers.routes) return;
@@ -680,7 +696,7 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
             }
           }
         } catch (err) {
-          // silently handle during unmount
+          // handled during unmount
         }
       }
       animId = requestAnimationFrame(animateLines);

@@ -1,23 +1,17 @@
-import React from "react";
-import { WorldBrief } from "../types";
+import { useUIStore } from '../store';
+import { useWorldBrief } from '../hooks/useApi';
+import type { WorldBrief } from '../types';
 
 interface AIBriefModalProps {
   showBrief: boolean;
   onClose: () => void;
-  briefData: WorldBrief | null | undefined;
+  briefData: WorldBrief | undefined;
   briefLoading: boolean;
   briefError: string | null;
   onRefresh: () => void;
 }
 
-export const AIBriefModal: React.FC<AIBriefModalProps> = ({
-  showBrief,
-  onClose,
-  briefData,
-  briefLoading,
-  briefError,
-  onRefresh,
-}) => {
+export function AIBriefModal({ showBrief, onClose, briefData, briefLoading, briefError, onRefresh }: AIBriefModalProps) {
   if (!showBrief) return null;
 
   return (
@@ -29,16 +23,10 @@ export const AIBriefModal: React.FC<AIBriefModalProps> = ({
             <span className="brief-title">GLOBAL SITUATION BRIEF</span>
           </div>
           <div className="brief-actions">
-            <button
-              className="brief-btn-refresh"
-              onClick={onRefresh}
-              disabled={briefLoading}
-            >
-              {briefLoading ? "ANALYZING..." : "⟳ REFRESH BRIEF"}
+            <button className="brief-btn-refresh" onClick={onRefresh} disabled={briefLoading}>
+              {briefLoading ? 'ANALYZING...' : '⟳ REFRESH BRIEF'}
             </button>
-            <button className="brief-btn-close" onClick={onClose}>
-              ✕
-            </button>
+            <button className="brief-btn-close" onClick={onClose}>✕</button>
           </div>
         </div>
 
@@ -51,9 +39,7 @@ export const AIBriefModal: React.FC<AIBriefModalProps> = ({
           )}
 
           {briefError && !briefLoading && (
-            <div className="brief-err">
-              <b>Failed to generate situation brief:</b> {briefError}
-            </div>
+            <div className="brief-err"><b>Failed to generate situation brief:</b> {briefError}</div>
           )}
 
           {briefData && !briefLoading && (
@@ -63,38 +49,34 @@ export const AIBriefModal: React.FC<AIBriefModalProps> = ({
                 <div className="brief-quote-text">{briefData.brief}</div>
               </div>
 
-              <div className="brief-signals-heading">
-                TELEMETRY INPUTS & CORROBORATING SIGNALS
-              </div>
-
+              <div className="brief-signals-heading">TELEMETRY INPUTS & CORROBORATING SIGNALS</div>
               <div className="brief-signals-grid">
                 <div className="signal-card">
                   <span className="sig-label">TOP INSTABILITY (CII)</span>
                   <div className="sig-tags">
-                    {briefData.signals?.top_cii?.map(([code, score]) => (
-                      <span key={code} className="sig-tag crit">
-                        {code}: {Number(score).toFixed(1)}
-                      </span>
-                    )) ?? <span>No active signals</span>}
+                    {briefData.signals.top_cii.map(([code, score]) => (
+                      <span key={code} className="sig-tag crit">{code}: {score.toFixed(0)}</span>
+                    ))}
                   </div>
                 </div>
                 <div className="signal-card">
-                  <span className="sig-label">24H GLOBAL EVENTS</span>
-                  <span className="sig-val">{briefData.signals?.events_24h ?? 0}</span>
+                  <span className="sig-label">ELEVATED CHOKEPOINTS</span>
+                  <span className="sig-value">{briefData.signals.hot_chokepoints} Monitored Corridors</span>
                 </div>
                 <div className="signal-card">
-                  <span className="sig-label">ELEVATED CHOKEPOINTS</span>
-                  <span className="sig-val hot">{briefData.signals?.hot_chokepoints ?? 0}</span>
+                  <span className="sig-label">24H GDELT EVENT VOLUME</span>
+                  <span className="sig-value">{briefData.signals.events_24h.toLocaleString()} Events Ingested</span>
+                </div>
+                <div className="signal-card">
+                  <span className="sig-label">AIRBORNE MILITARY FLEET</span>
+                  <span className="sig-value">0 Active Tracks</span>
                 </div>
               </div>
 
-              <div className="brief-footer">
-                <span>
-                  MODEL: <b>{briefData.model}</b>
-                </span>
-                <span>
-                  GENERATED: {new Date(briefData.generated_at).toLocaleString()}
-                </span>
+              <div className="brief-footer-info">
+                <span>Model: <b>{briefData.model}</b></span>
+                <span>Generated at: <b>{briefData.generated_at}</b></span>
+                <button className="copy-btn" onClick={() => { navigator.clipboard.writeText(briefData.brief); alert('Situation brief copied to clipboard.'); }}>COPY TEXT</button>
               </div>
             </>
           )}
@@ -102,4 +84,4 @@ export const AIBriefModal: React.FC<AIBriefModalProps> = ({
       </div>
     </div>
   );
-};
+}

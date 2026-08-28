@@ -10,6 +10,7 @@ import type {
   LoadedState,
   Alert,
 } from '../types';
+import type maplibregl from 'maplibre-gl';
 
 interface UIState {
   // Map state
@@ -40,6 +41,10 @@ interface UIState {
   alerts: Alert[];
   maxAlerts: number;
 
+  // Map reference
+  mapRef: maplibregl.Map | null;
+  setMapRef: (map: maplibregl.Map | null) => void;
+
   // Actions
   setView3d: (v: boolean) => void;
   setMapTheme: (t: MapTheme) => void;
@@ -56,6 +61,7 @@ interface UIState {
   setTvChannel: (c: string) => void;
   setTvMinimized: (v: boolean) => void;
   toggleLayer: (k: keyof LayerState) => void;
+  setLayers: (layers: LayerState) => void;
   setLoaded: (k: keyof LoadedState, v: boolean) => void;
   addAlert: (alert: Alert) => void;
   clearAlerts: () => void;
@@ -105,6 +111,7 @@ export const useUIStore = create<UIState>()(
       loaded: defaultLoaded,
       alerts: [],
       maxAlerts: 50,
+      mapRef: null,
 
       setView3d: (v) => set({ view3d: v }),
       setMapTheme: (t) => set({ mapTheme: t }),
@@ -124,6 +131,7 @@ export const useUIStore = create<UIState>()(
         set((s) => ({
           layers: { ...(s.layers || defaultLayers), [k]: !(s.layers || defaultLayers)[k] },
         })),
+      setLayers: (layers) => set({ layers }),
       setLoaded: (k, v) =>
         set((s) => ({ loaded: { ...(s.loaded || defaultLoaded), [k]: v } })),
       addAlert: (alert) =>
@@ -131,6 +139,7 @@ export const useUIStore = create<UIState>()(
           alerts: [alert, ...(s.alerts || []).slice(0, (s.maxAlerts || 50) - 1)],
         })),
       clearAlerts: () => set({ alerts: [] }),
+      setMapRef: (map) => set({ mapRef: map }),
     }),
     {
       name: "war-monitor-ui-v2",
