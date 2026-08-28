@@ -12,7 +12,7 @@ import {
   IntelSite,
   IntelRoute,
 } from "../types";
-import { greatCircle, showPopup } from "../utils/geo";
+import { greatCircle, showPopup, INDIAN_PORTS } from "../utils/geo";
 import { getIndiaPortName } from "../utils/format";
 
 interface GlobeViewProps {
@@ -354,6 +354,80 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
           map.on("click", "route-lines-active", handleRouteClick);
         }
 
+        // 3b. Indian Commercial Ports (Designated Trade Gateways)
+        const portData = {
+          type: "FeatureCollection" as const,
+          features: INDIAN_PORTS.map((p) => ({
+            type: "Feature" as const,
+            geometry: { type: "Point" as const, coordinates: [p.long, p.lat] },
+            properties: {
+              code: p.code,
+              name: p.name,
+              state: p.state,
+              commodities: p.commodities,
+              trafficType: p.trafficType,
+            },
+          })),
+        };
+        if (!map.getSource("india-ports")) {
+          map.addSource("india-ports", { type: "geojson", data: portData as never });
+          map.addLayer({
+            id: "port-pulse-glow",
+            type: "circle",
+            source: "india-ports",
+            paint: {
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 4.5, 4, 7.5, 8, 13],
+              "circle-color": "#38bdf8",
+              "circle-opacity": 0.5,
+              "circle-blur": 0.5,
+            },
+          });
+          map.addLayer({
+            id: "port-circle-outer",
+            type: "circle",
+            source: "india-ports",
+            paint: {
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 3.0, 4, 4.5, 8, 7.0],
+              "circle-color": "#0284c7",
+              "circle-stroke-color": "#ffffff",
+              "circle-stroke-width": 1.5,
+              "circle-opacity": 1.0,
+            },
+          });
+          map.addLayer({
+            id: "port-labels",
+            type: "symbol",
+            source: "india-ports",
+            layout: {
+              "text-field": ["get", "name"],
+              "text-size": ["interpolate", ["linear"], ["zoom"], 1, 8, 4, 10, 8, 12],
+              "text-offset": [0, 1.1],
+              "text-anchor": "top",
+              "text-allow-overlap": false,
+              "text-ignore-placement": false,
+            },
+            paint: {
+              "text-color": "#38bdf8",
+              "text-halo-color": "#020617",
+              "text-halo-width": 1.8,
+            },
+          });
+
+          const handlePortMarkerClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
+            const f = e.features?.[0];
+            if (!f) return;
+            showPopup(
+              map,
+              e.lngLat,
+              `<div class="wm-pop"><span class="wm-pop-code">${f.properties?.code}</span> ${f.properties?.state}<br/><b>${f.properties?.name}</b><br/><span class="wm-pop-dim">Traffic: ${f.properties?.commodities}<br/>${f.properties?.trafficType}</span></div>`
+            );
+          };
+          map.on("click", "port-circle-outer", handlePortMarkerClick);
+          map.on("click", "port-labels", handlePortMarkerClick);
+        } else if (map.getSource("india-ports")) {
+          (map.getSource("india-ports") as maplibregl.GeoJSONSource).setData(portData as never);
+        }
+
         // 4. Military Flights
         const flightData = {
           type: "FeatureCollection" as const,
@@ -616,6 +690,9 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
         vis("route-lines-base", layers.routes);
         vis("route-lines-glow", layers.routes);
         vis("route-lines-active", layers.routes);
+        vis("port-pulse-glow", layers.routes);
+        vis("port-circle-outer", layers.routes);
+        vis("port-labels", layers.routes);
         vis("flight-circles", layers.flights);
         vis("intel-bases-layer", layers.bases);
         vis("intel-nuclear-layer", layers.nuclear);

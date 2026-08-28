@@ -38,3 +38,142 @@ export function showPopup(map: maplibregl.Map, lngLat: maplibregl.LngLat, html: 
     .setHTML(html)
     .addTo(map);
 }
+
+export interface IndianPort {
+  code: string;
+  name: string;
+  state: string;
+  lat: number;
+  long: number;
+  commodities: string;
+  trafficType: string;
+}
+
+export const INDIAN_PORTS: IndianPort[] = [
+  {
+    code: "IN-VAD",
+    name: "Vadinar / Sikka Port",
+    state: "Gujarat",
+    lat: 22.4500,
+    long: 69.8000,
+    commodities: "Crude Oil, Refined Petroleum Exports",
+    trafficType: "Major Crude Oil & Petrochemicals Terminal",
+  },
+  {
+    code: "IN-IXY",
+    name: "Kandla (Deendayal) Port",
+    state: "Gujarat",
+    lat: 22.8360,
+    long: 70.2185,
+    commodities: "Vegetable Oils, Fertilizers, Basmati Rice",
+    trafficType: "Major Bulk & Edible Oil Hub",
+  },
+  {
+    code: "IN-MUN",
+    name: "Mundra Commercial Port",
+    state: "Gujarat",
+    lat: 22.7441,
+    long: 69.7025,
+    commodities: "Petroleum Products, Plastics Raw, Cotton Yarn",
+    trafficType: "Largest Multi-Cargo Commercial Port",
+  },
+  {
+    code: "IN-DHJ",
+    name: "Dahej Chemical & LNG Port",
+    state: "Gujarat",
+    lat: 21.7000,
+    long: 72.5800,
+    commodities: "Organic Chemicals, LNG, Refined Copper",
+    trafficType: "PCPIR Chemical Corridor & Petronet LNG",
+  },
+  {
+    code: "IN-HZR",
+    name: "Hazira / Surat Port",
+    state: "Gujarat",
+    lat: 21.1086,
+    long: 72.6358,
+    commodities: "Diamonds Unworked, Cut Diamonds & Jewelry",
+    trafficType: "Global Diamond Hub, LNG & Heavy Engineering",
+  },
+  {
+    code: "IN-BOM",
+    name: "Jawaharlal Nehru Port (JNPT)",
+    state: "Maharashtra",
+    lat: 18.9500,
+    long: 72.9500,
+    commodities: "Gold Bullion, Machinery Parts, Medical Instruments",
+    trafficType: "Premier Container Gateway of India",
+  },
+  {
+    code: "IN-MRM",
+    name: "Mormugao Port",
+    state: "Goa",
+    lat: 15.4167,
+    long: 73.8000,
+    commodities: "Refined Sugar, Iron Ore & General Cargo",
+    trafficType: "Deepwater Natural Harbor",
+  },
+  {
+    code: "IN-COK",
+    name: "Cochin Port / Kochi LNG",
+    state: "Kerala",
+    lat: 9.9656,
+    long: 76.2711,
+    commodities: "Spices, Seafood & Shrimp, Tea & Coffee, LNG",
+    trafficType: "Spice Coast International Transshipment Hub",
+  },
+  {
+    code: "IN-TCR",
+    name: "V.O. Chidambaranar (Tuticorin)",
+    state: "Tamil Nadu",
+    lat: 8.7533,
+    long: 78.1633,
+    commodities: "Cotton Yarn & Fabrics, Refined Copper",
+    trafficType: "All-Weather Southern Industrial Gateway",
+  },
+  {
+    code: "IN-MAA",
+    name: "Chennai Port & Kamarajar Ennore",
+    state: "Tamil Nadu",
+    lat: 13.0844,
+    long: 80.2980,
+    commodities: "Automobiles Ro-Ro, Telecom Mobiles, ICs, Leather",
+    trafficType: "Automotive Hub & Electronic Corridors",
+  },
+  {
+    code: "IN-KID",
+    name: "Kakinada Deepwater Port",
+    state: "Andhra Pradesh",
+    lat: 16.9890,
+    long: 82.2874,
+    commodities: "Non-Basmati Rice, Agricultural Exports",
+    trafficType: "East Coast Agri-Bulk Deepwater Terminal",
+  },
+  {
+    code: "IN-VTZ",
+    name: "Visakhapatnam Port",
+    state: "Andhra Pradesh",
+    lat: 17.6868,
+    long: 83.2986,
+    commodities: "Coking Coal, Steel Flat, Pharmaceuticals, Frozen Shrimp",
+    trafficType: "Major Bulk, Steel & Pharma Port",
+  },
+  {
+    code: "IN-PRT",
+    name: "Paradip Port",
+    state: "Odisha",
+    lat: 20.2644,
+    long: 86.6085,
+    commodities: "Thermal/Coking Coal, Steel Exports, Fertilizers",
+    trafficType: "Major Dry Bulk & Energy Port of East Coast",
+  },
+  {
+    code: "IN-HLD",
+    name: "Syama Prasad Mookerjee Port (Haldia/Kolkata)",
+    state: "West Bengal",
+    lat: 22.0333,
+    long: 88.0833,
+    commodities: "Darjeeling/Assam Tea, Leather Goods, Vegetable Oils",
+    trafficType: "Riverine Multi-Modal Gateway for Eastern India",
+  },
+];
