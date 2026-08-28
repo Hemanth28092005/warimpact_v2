@@ -13,7 +13,7 @@ import {
   IntelRoute,
 } from "../types";
 import { greatCircle, showPopup, INDIAN_PORTS } from "../utils/geo";
-import { getIndiaPortName } from "../utils/format";
+import { getIndiaPortName, getIndiaPortCode } from "../utils/format";
 
 interface GlobeViewProps {
   boundariesData?: { iso_a3: string; geojson: object }[];
@@ -102,6 +102,7 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
     setWindowH,
     layers,
     toggleLayer,
+    selectedPort,
   } = useUIStore();
 
   // 1. Initialize Map directly on DOM ref
@@ -279,8 +280,13 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
         }
 
         // 3. Trade routes
-        if (!map.getSource("trade-routes") && loaded.routes && routes.length > 0) {
-          const features = routes.map((r) => ({
+        const activeRoutes = selectedPort === "ALL"
+          ? routes
+          : routes.filter((r) => getIndiaPortCode(r.dest_lat, r.dest_long) === selectedPort);
+
+        const routeData = {
+          type: "FeatureCollection" as const,
+          features: activeRoutes.map((r) => ({
             type: "Feature" as const,
             geometry: {
               type: "LineString" as const,
@@ -294,8 +300,11 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
               choke: r.primary_chokepoint ?? "direct",
               color: r.risk_score >= 80 ? "#ef4444" : r.risk_score >= 60 ? "#f97316" : r.risk_score >= 35 ? "#eab308" : "#22d3ee",
             },
-          }));
-          map.addSource("trade-routes", { type: "geojson", data: { type: "FeatureCollection", features } as never });
+          })),
+        };
+
+        if (!map.getSource("trade-routes") && loaded.routes && routes.length > 0) {
+          map.addSource("trade-routes", { type: "geojson", data: routeData as never });
           map.addLayer({
             id: "route-lines-base",
             type: "line",
@@ -352,6 +361,8 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
           };
           map.on("click", "route-lines-base", handleRouteClick);
           map.on("click", "route-lines-active", handleRouteClick);
+        } else if (map.getSource("trade-routes")) {
+          (map.getSource("trade-routes") as maplibregl.GeoJSONSource).setData(routeData as never);
         }
 
         // 3b. Indian Commercial Ports (Designated Trade Gateways)
@@ -376,10 +387,25 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
             type: "circle",
             source: "india-ports",
             paint: {
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 4.5, 4, 7.5, 8, 13],
-              "circle-color": "#38bdf8",
-              "circle-opacity": 0.5,
-              "circle-blur": 0.5,
+              "circle-radius": [
+                "case",
+                ["==", ["get", "code"], selectedPort],
+                ["interpolate", ["linear"], ["zoom"], 1, 9, 4, 15, 8, 22],
+                ["interpolate", ["linear"], ["zoom"], 1, 4.5, 4, 7.5, 8, 13],
+              ],
+              "circle-color": [
+                "case",
+                ["==", ["get", "code"], selectedPort],
+                "#00f0ff",
+                "#38bdf8",
+              ],
+              "circle-opacity": [
+                "case",
+                ["==", ["get", "code"], selectedPort],
+                0.9,
+                0.5,
+              ],
+              "circle-blur": 0.4,
             },
           });
           map.addLayer({
@@ -387,10 +413,25 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
             type: "circle",
             source: "india-ports",
             paint: {
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 3.0, 4, 4.5, 8, 7.0],
-              "circle-color": "#0284c7",
+              "circle-radius": [
+                "case",
+                ["==", ["get", "code"], selectedPort],
+                ["interpolate", ["linear"], ["zoom"], 1, 4.5, 4, 6.5, 8, 9.0],
+                ["interpolate", ["linear"], ["zoom"], 1, 3.0, 4, 4.5, 8, 7.0],
+              ],
+              "circle-color": [
+                "case",
+                ["==", ["get", "code"], selectedPort],
+                "#00f0ff",
+                "#0284c7",
+              ],
               "circle-stroke-color": "#ffffff",
-              "circle-stroke-width": 1.5,
+              "circle-stroke-width": [
+                "case",
+                ["==", ["get", "code"], selectedPort],
+                2.5,
+                1.5,
+              ],
               "circle-opacity": 1.0,
             },
           });
@@ -407,7 +448,12 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
               "text-ignore-placement": false,
             },
             paint: {
-              "text-color": "#38bdf8",
+              "text-color": [
+                "case",
+                ["==", ["get", "code"], selectedPort],
+                "#00f0ff",
+                "#38bdf8",
+              ],
               "text-halo-color": "#020617",
               "text-halo-width": 1.8,
             },
@@ -711,14 +757,18 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
     } else {
       map.once("load", apply);
     }
-  }, [layers, quakes, protests, routes, flights, chokepoints, intelSites, intelRoutes, loaded, mapTheme]);
+  }, [layers, quakes, protests, routes, flights, chokepoints, intelSites, intelRoutes, loaded, mapTheme, selectedPort]);
 
   // 5. Moving Commodity Transport Lines Animation
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !loaded.routes || routes.length === 0 || !layers.routes) return;
 
-    const animatedTracks = routes.map((r, idx) => {
+    const activeRoutes = selectedPort === "ALL"
+      ? routes
+      : routes.filter((r) => getIndiaPortCode(r.dest_lat, r.dest_long) === selectedPort);
+
+    const animatedTracks = activeRoutes.map((r, idx) => {
       const path = greatCircle([r.origin_long, r.origin_lat], [r.dest_long, r.dest_lat], 50);
       const color = r.risk_score >= 80 ? "#ef4444" : r.risk_score >= 60 ? "#f97316" : r.risk_score >= 35 ? "#eab308" : "#22d3ee";
       const durationMs = 4200 + ((idx * 683) % 5500);
@@ -789,7 +839,7 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
     return () => {
       cancelAnimationFrame(animId);
     };
-  }, [routes, loaded.routes, layers.routes]);
+  }, [routes, loaded.routes, layers.routes, selectedPort]);
 
   // 6. Boundaries and Country fills
   useEffect(() => {

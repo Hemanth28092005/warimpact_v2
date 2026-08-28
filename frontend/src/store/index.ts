@@ -21,6 +21,7 @@ interface UIState {
   windowH: number;
   cascadeCountry: string;
   headlineRegion: string;
+  selectedPort: string;
 
   // Panel tabs
   p1: Panel1Tab;
@@ -53,6 +54,7 @@ interface UIState {
   setWindowH: (h: number) => void;
   setCascadeCountry: (c: string) => void;
   setHeadlineRegion: (r: string) => void;
+  setSelectedPort: (p: string) => void;
   setP1: (t: Panel1Tab) => void;
   setP2: (t: Panel2Tab) => void;
   setP3: (t: Panel3Tab) => void;
@@ -100,6 +102,7 @@ export const useUIStore = create<UIState>()(
       windowH: 168,
       cascadeCountry: 'ISR',
       headlineRegion: 'middle_east',
+      selectedPort: 'ALL',
       p1: 'escalations',
       p2: 'cii',
       p3: 'odds',
@@ -120,6 +123,7 @@ export const useUIStore = create<UIState>()(
       setWindowH: (h) => set({ windowH: h }),
       setCascadeCountry: (c) => set({ cascadeCountry: c }),
       setHeadlineRegion: (r) => set({ headlineRegion: r }),
+      setSelectedPort: (p) => set({ selectedPort: p }),
       setP1: (t) => set({ p1: t }),
       setP2: (t) => set({ p2: t }),
       setP3: (t) => set({ p3: t }),

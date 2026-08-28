@@ -44,3 +44,21 @@ export function getIndiaPortName(lat: number, lon: number): string {
   if (Math.abs(lat - 22.0333) < 0.2 && Math.abs(lon - 88.0833) < 0.2) return "Haldia / Kolkata (WB)";
   return "Indian Maritime Port";
 }
+
+export function getIndiaPortCode(lat: number, lon: number): string {
+  if (Math.abs(lat - 22.45) < 0.2 && Math.abs(lon - 69.80) < 0.2) return "IN-VAD";
+  if (Math.abs(lat - 21.1086) < 0.2 && Math.abs(lon - 72.6358) < 0.2) return "IN-HZR";
+  if (Math.abs(lat - 22.7441) < 0.2 && Math.abs(lon - 69.7025) < 0.2) return "IN-MUN";
+  if (Math.abs(lat - 22.8360) < 0.2 && Math.abs(lon - 70.2185) < 0.2) return "IN-IXY";
+  if (Math.abs(lat - 21.7000) < 0.2 && Math.abs(lon - 72.5800) < 0.2) return "IN-DHJ";
+  if (Math.abs(lat - 18.9500) < 0.2 && Math.abs(lon - 72.9500) < 0.2) return "IN-BOM";
+  if (Math.abs(lat - 15.4167) < 0.2 && Math.abs(lon - 73.8000) < 0.2) return "IN-MRM";
+  if (Math.abs(lat - 9.9656) < 0.2 && Math.abs(lon - 76.2711) < 0.2) return "IN-COK";
+  if (Math.abs(lat - 8.7533) < 0.2 && Math.abs(lon - 78.1633) < 0.2) return "IN-TCR";
+  if (Math.abs(lat - 13.0844) < 0.2 && Math.abs(lon - 80.2980) < 0.2) return "IN-MAA";
+  if (Math.abs(lat - 16.9890) < 0.2 && Math.abs(lon - 82.2874) < 0.2) return "IN-KID";
+  if (Math.abs(lat - 17.6868) < 0.2 && Math.abs(lon - 83.2986) < 0.2) return "IN-VTZ";
+  if (Math.abs(lat - 20.2644) < 0.2 && Math.abs(lon - 86.6085) < 0.2) return "IN-PRT";
+  if (Math.abs(lat - 22.0333) < 0.2 && Math.abs(lon - 88.0833) < 0.2) return "IN-HLD";
+  return "IN-GEN";
+}

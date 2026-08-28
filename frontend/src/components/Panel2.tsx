@@ -1,7 +1,8 @@
 import { useUIStore } from '../store';
 import type { Chokepoint, TradeRoute, AggressionPair, CascadePair } from '../types';
-import { timeAgo, getIndiaPortName } from '../utils/format';
+import { timeAgo, getIndiaPortName, getIndiaPortCode } from '../utils/format';
 import { CASCADE_COUNTRIES } from '../types';
+import { INDIAN_PORTS } from '../utils/geo';
 
 interface Panel2Props {
   scoresArr: [string, number][];
@@ -12,7 +13,7 @@ interface Panel2Props {
 }
 
 export function Panel2({ scoresArr, chokepoints, aggression, cascade, routes }: Panel2Props) {
-  const { cascadeCountry, setCascadeCountry, p2, setP2, mapRef } = useUIStore();
+  const { cascadeCountry, setCascadeCountry, p2, setP2, mapRef, selectedPort, setSelectedPort } = useUIStore();
 
   const topAggression = aggression
     .filter((p) => p.aggression_score !== null && p.data_source === 'gdelt_derived')
@@ -113,20 +114,55 @@ export function Panel2({ scoresArr, chokepoints, aggression, cascade, routes }: 
 
         {p2 === 'routes' && (
           <>
-            {topRoutes.slice(0, 14).map((r: TradeRoute) => (
-              <div
-                key={r.id}
-                className="row row-clickable"
-                onClick={() => mapRef?.flyTo({ center: [r.origin_long, r.origin_lat], zoom: 4 })}
+            <div className="inline-select" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <span className="row-sub" style={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, color: '#38bdf8' }}>PORT GATEWAY:</span>
+              <select
+                className="cmd-select"
+                value={selectedPort}
+                onChange={(e) => {
+                  const pCode = e.target.value;
+                  setSelectedPort(pCode);
+                  if (pCode !== 'ALL') {
+                    const portObj = INDIAN_PORTS.find((p) => p.code === pCode);
+                    if (portObj && mapRef) {
+                      mapRef.flyTo({ center: [portObj.long, portObj.lat], zoom: 5.2, pitch: 35 });
+                    }
+                  } else if (mapRef) {
+                    mapRef.flyTo({ center: [78.9629, 20.5937], zoom: 3.5, pitch: 20 });
+                  }
+                }}
+                style={{ padding: '2px 8px', fontSize: '11px', background: '#0b1329', border: '1px solid #0284c7', color: '#f8fafc', borderRadius: '4px' }}
               >
-                <span className={`sev-tag ${r.risk_score >= 70 ? 'crit' : r.risk_score >= 45 ? 'high' : 'mid'}`}>{r.risk_score.toFixed(0)}</span>
-                <span className="row-main">
-                  <span className="row-title">{r.commodity_code} · {r.partner_country} → {getIndiaPortName(r.dest_lat, r.dest_long)}</span>
-                  <span className="row-sub">via {r.primary_chokepoint ?? 'direct corridor'} · Risk: {r.risk_score.toFixed(1)}/100</span>
-                </span>
-              </div>
-            ))}
-            {topRoutes.length === 0 && <div className="empty">// no trade routes ingested</div>}
+                <option value="ALL">🌐 ALL PORTS ({topRoutes.length} ROUTES)</option>
+                {INDIAN_PORTS.map((p) => {
+                  const count = topRoutes.filter((r) => getIndiaPortCode(r.dest_lat, r.dest_long) === p.code).length;
+                  return (
+                    <option key={p.code} value={p.code}>
+                      ⚓ {p.name} ({count} routes)
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+            {topRoutes
+              .filter((r: TradeRoute) => selectedPort === 'ALL' || getIndiaPortCode(r.dest_lat, r.dest_long) === selectedPort)
+              .slice(0, 18)
+              .map((r: TradeRoute) => (
+                <div
+                  key={r.id}
+                  className="row row-clickable"
+                  onClick={() => mapRef?.flyTo({ center: [r.origin_long, r.origin_lat], zoom: 4 })}
+                >
+                  <span className={`sev-tag ${r.risk_score >= 70 ? 'crit' : r.risk_score >= 45 ? 'high' : 'mid'}`}>{r.risk_score.toFixed(0)}</span>
+                  <span className="row-main">
+                    <span className="row-title">{r.commodity_code} · {r.partner_country} → {getIndiaPortName(r.dest_lat, r.dest_long)}</span>
+                    <span className="row-sub">via {r.primary_chokepoint ?? 'direct corridor'} · Risk: {r.risk_score.toFixed(1)}/100</span>
+                  </span>
+                </div>
+              ))}
+            {topRoutes.filter((r: TradeRoute) => selectedPort === 'ALL' || getIndiaPortCode(r.dest_lat, r.dest_long) === selectedPort).length === 0 && (
+              <div className="empty">// no trade routes active for selected port</div>
+            )}
           </>
         )}
       </div>
