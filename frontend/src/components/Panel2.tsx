@@ -73,11 +73,11 @@ export function Panel2({ scoresArr, chokepoints, aggression, cascade, routes }: 
             {topAggression.slice(0, 10).map((p: AggressionPair) => (
               <div key={`${p.country_a}-${p.country_b}`} className="row">
                 <span className={`sev-tag ${(p.aggression_score ?? 0) >= 60 ? 'crit' : (p.aggression_score ?? 0) >= 45 ? 'high' : 'mid'}`}>
-                  {p.event_count >= 1000 ? `${(p.event_count / 1000).toFixed(0)}k` : p.event_count}
+                  {(p.aggression_score ?? 0).toFixed(0)}
                 </span>
                 <span className="row-main">
                   <span className="row-title">{p.country_a} → {p.country_b}</span>
-                  <span className="row-sub">{p.event_count.toLocaleString()} events · Aggression Score: {(p.aggression_score ?? 0).toFixed(0)}/100</span>
+                  <span className="row-sub">{p.event_count.toLocaleString()} events · 365d window</span>
                 </span>
               </div>
             ))}
