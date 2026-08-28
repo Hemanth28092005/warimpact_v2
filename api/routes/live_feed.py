@@ -109,6 +109,11 @@ async def get_live_escalation_feed(
                     OR g.actor1_country_code = ANY(%s)
                     OR g.actor2_country_code = ANY(%s)
                   )
+                  AND g.actor1_country_code IS NOT NULL
+                  AND g.actor2_country_code IS NOT NULL
+                  AND g.actor1_country_code <> ''
+                  AND g.actor2_country_code <> ''
+                  AND g.actor1_country_code <> g.actor2_country_code
                   AND g.event_date >= (SELECT COALESCE(MAX(event_date), CURRENT_DATE) FROM gdelt_events) - (%s || ' hours')::INTERVAL
                 ORDER BY g.event_date DESC, g.num_mentions DESC, g.global_event_id DESC
                 LIMIT 500
@@ -124,14 +129,16 @@ async def get_live_escalation_feed(
         quad_class = int(r[11]) if r[11] is not None else None
         severity = compute_composite_historical_sentiment(avg_tone, goldstein, quad_class)
 
-        if severity <= -0.5:
+        a1 = (r[4] or "").strip().upper()
+        a2 = (r[5] or "").strip().upper()
+        if severity <= -0.5 and a1 and a2 and a1 != a2 and a1 != "-" and a2 != "-" and a1 != "—" and a2 != "—":
             raw_events.append({
                 "global_event_id": r[0],
                 "event_date": str(r[1]),
                 "ingested_at": r[2].isoformat() if r[2] else None,
                 "source_url": r[3],
-                "actor1_code": r[4],
-                "actor2_code": r[5],
+                "actor1_code": a1,
+                "actor2_code": a2,
                 "country_code": r[6],
                 "event_code": r[7],
                 "event_severity": severity,

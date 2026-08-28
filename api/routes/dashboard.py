@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import uuid
+from datetime import datetime
 from typing import Any, Optional
 from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import BaseModel, ConfigDict, Field
@@ -128,6 +130,152 @@ class WorldBoundaryResponse(BaseModel):
 
 
 # --- Endpoints ---
+
+class AlertResponse(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+    id: str = Field(..., description="Unique alert identifier")
+    type: str = Field(..., description="Alert type: cii, chokepoint, flight, seismic, cascade")
+    level: str = Field(..., description="Alert level: critical, warning, info")
+    entity: str = Field(..., description="Entity identifier (country code, chokepoint code, etc.)")
+    value: float = Field(..., description="Metric value that triggered the alert")
+    message: str = Field(..., description="Human-readable alert message")
+    timestamp: str = Field(..., description="ISO timestamp of alert generation")
+
+
+@router.get("/alerts/recent", response_model=list[AlertResponse])
+async def get_recent_alerts(
+    limit: int = Query(default=50, ge=1, le=200, description="Maximum alerts to return"),
+) -> list[dict[str, Any]]:
+    """Retrieve recent system alerts from cross-stream analysis."""
+    import time
+    from datetime import datetime, timedelta
+    import uuid
+
+    alerts = []
+
+    async with open_async_connection() as conn:
+        async with conn.cursor() as cur:
+            # CII critical/warning alerts
+            await cur.execute(
+                """
+                SELECT country_code, cii_score
+                FROM country_instability_index
+                WHERE score_date = (SELECT MAX(score_date) FROM country_instability_index)
+                  AND cii_score >= 50
+                ORDER BY cii_score DESC
+                """
+            )
+            for code, score in await cur.fetchall():
+                level = "critical" if score >= 70 else "warning"
+                alerts.append({
+                    "id": str(uuid.uuid4()),
+                    "type": "cii",
+                    "level": level,
+                    "entity": code,
+                    "value": float(score),
+                    "message": f"{code} CII {score:.1f} — {level.upper()}",
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                })
+
+            # Chokepoint alerts
+            await cur.execute(
+                """
+                SELECT code, name, disruption_score, status
+                FROM chokepoints
+                WHERE disruption_score >= 40
+                ORDER BY disruption_score DESC
+                """
+            )
+            for code, name, score, status in await cur.fetchall():
+                level = "critical" if status == "critical" else "warning"
+                alerts.append({
+                    "id": str(uuid.uuid4()),
+                    "type": "chokepoint",
+                    "level": level,
+                    "entity": code,
+                    "value": float(score),
+                    "message": f"{name} ({code}) disruption {score:.0f} — {status.upper()}",
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                })
+
+            # Flight density near chokepoints
+            await cur.execute(
+                """
+                SELECT cp.code, COUNT(*) as cnt
+                FROM military_flights mf
+                JOIN chokepoints cp ON ST_DWithin(
+                    ST_MakePoint(mf.longitude, mf.latitude)::geography,
+                    ST_MakePoint(cp.long, cp.lat)::geography,
+                    100000
+                )
+                WHERE mf.observed_at >= NOW() - INTERVAL '30 minutes'
+                GROUP BY cp.code
+                HAVING COUNT(*) >= 5
+                """
+            )
+            for code, cnt in await cur.fetchall():
+                alerts.append({
+                    "id": str(uuid.uuid4()),
+                    "type": "flight",
+                    "level": "warning",
+                    "entity": code,
+                    "value": float(cnt),
+                    "message": f"{cnt} military flights near {code} (last 30m)",
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                })
+
+            # Seismic near chokepoints
+            await cur.execute(
+                """
+                SELECT near_chokepoint_code, magnitude, place
+                FROM seismic_events
+                WHERE near_chokepoint_code IS NOT NULL
+                  AND occurred_at >= NOW() - INTERVAL '24 hours'
+                  AND magnitude >= 5.0
+                ORDER BY magnitude DESC
+                LIMIT 5
+                """
+            )
+            for code, mag, place in await cur.fetchall():
+                alerts.append({
+                    "id": str(uuid.uuid4()),
+                    "type": "seismic",
+                    "level": "critical" if mag >= 6.0 else "warning",
+                    "entity": code,
+                    "value": float(mag),
+                    "message": f"M{mag:.1f} quake near {code} ({place})",
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                })
+
+            # Cascade contagion alerts
+            await cur.execute(
+                """
+                SELECT source_country, target_country, contagion_score
+                FROM cascade_scores
+                WHERE window_days = 7
+                  AND contagion_score >= 0.6
+                ORDER BY contagion_score DESC
+                LIMIT 5
+                """
+            )
+            for src, tgt, score in await cur.fetchall():
+                alerts.append({
+                    "id": str(uuid.uuid4()),
+                    "type": "cascade",
+                    "level": "critical",
+                    "entity": f"{src}->{tgt}",
+                    "value": float(score),
+                    "message": f"Cascade contagion {src}⇄{tgt}: {(score*100):.0f}% co-spike rate",
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                })
+
+    # Sort by level (critical first) then by timestamp
+    level_order = {"critical": 0, "warning": 1, "info": 2}
+    alerts.sort(key=lambda a: (level_order.get(a["level"], 3), a["timestamp"]), reverse=True)
+
+    return alerts[:limit]
+
 
 @router.get("/chokepoints", response_model=list[ChokepointResponse])
 async def get_chokepoints() -> list[dict[str, Any]]:

@@ -75,6 +75,15 @@ function WarMonitorApp(): JSX.Element {
   const intelRoutes = dashboardData?.intelRoutes ?? [];
 
   const feed = liveFeedData?.items ?? [];
+  const distinctFeed = useMemo(
+    () =>
+      feed.filter((f) => {
+        const a1 = (f.actor1_code || "").trim().toUpperCase();
+        const a2 = (f.actor2_code || "").trim().toUpperCase();
+        return a1 && a2 && a1 !== a2 && a1 !== "-" && a2 !== "-" && a1 !== "—" && a2 !== "—";
+      }),
+    [feed]
+  );
   const cascade = cascadeData?.pairs ?? [];
 
   const ciiScores = useMemo(() => {
@@ -127,7 +136,7 @@ function WarMonitorApp(): JSX.Element {
       <CommandBar defconLevel={defconLevel} />
       <HeroBanner alerts={alertsData} avgCii={avgCii} defconLevel={defconLevel} />
       <SitBar
-        escalationsCount={feed.length}
+        escalationsCount={distinctFeed.length}
         govActionsCount={govActions.length}
         flightsCount={flights.length}
         chokeAlertsCount={chokepoints.filter((c) => c.status !== "green").length}
@@ -159,7 +168,7 @@ function WarMonitorApp(): JSX.Element {
       />
 
       <BottomPanels
-        feed={feed}
+        feed={distinctFeed}
         govActions={govActions}
         protests={protests}
         scoresArr={scoresArr}

@@ -11,7 +11,13 @@ interface Panel1Props {
 export function Panel1({ feed, govActions, protests }: Panel1Props) {
   const { p1, setP1 } = useUIStore();
 
-  const count = p1 === 'escalations' ? feed.length : p1 === 'gov_actions' ? govActions.length : Math.min(12, protests.length);
+  const bilateralFeed = feed.filter((f: FeedItem) => {
+    const a1 = (f.actor1_code || "").trim().toUpperCase();
+    const a2 = (f.actor2_code || "").trim().toUpperCase();
+    return a1 && a2 && a1 !== a2 && a1 !== "-" && a2 !== "-" && a1 !== "—" && a2 !== "—";
+  });
+
+  const count = p1 === 'escalations' ? bilateralFeed.length : p1 === 'gov_actions' ? govActions.length : Math.min(12, protests.length);
 
   return (
     <section className="bp">
@@ -20,19 +26,25 @@ export function Panel1({ feed, govActions, protests }: Panel1Props) {
         <span className="bp-count">{count}</span>
       </div>
       <div className="bp-tabs">
-        <button className={p1 === 'escalations' ? 'btab active' : 'btab'} onClick={() => setP1('escalations')}>ESCALATIONS</button>
-        <button className={p1 === 'gov_actions' ? 'btab active' : 'btab'} onClick={() => setP1('gov_actions')}>GOV ACTIONS ({govActions.length})</button>
-        <button className={p1 === 'protests' ? 'btab active' : 'btab'} onClick={() => setP1('protests')}>CIVIL UNREST ({Math.min(12, protests.length)})</button>
+        <button className={p1 === 'escalations' ? 'btab active' : 'btab'} onClick={() => setP1('escalations')}>
+          ESCALATIONS ({bilateralFeed.length})
+        </button>
+        <button className={p1 === 'gov_actions' ? 'btab active' : 'btab'} onClick={() => setP1('gov_actions')}>
+          GOV ACTIONS ({govActions.length})
+        </button>
+        <button className={p1 === 'protests' ? 'btab active' : 'btab'} onClick={() => setP1('protests')}>
+          CIVIL UNREST ({Math.min(12, protests.length)})
+        </button>
       </div>
       <div className="bp-list">
         {p1 === 'escalations' && (
           <>
-            {feed.length === 0 && <div className="empty">// no escalations in window</div>}
-            {feed.slice(0, 14).map((f: FeedItem) => (
+            {bilateralFeed.length === 0 && <div className="empty">// no bilateral escalations in window</div>}
+            {bilateralFeed.slice(0, 14).map((f: FeedItem) => (
               <a key={f.global_event_id} className="row" href={f.source_url ?? '#'} target="_blank" rel="noreferrer">
                 <span className={`sev-tag ${f.event_severity <= -3 ? 'crit' : 'high'}`}>{f.event_severity.toFixed(1)}</span>
                 <span className="row-main">
-                  <span className="row-title">{f.actor1_code ?? '—'} → {f.actor2_code ?? '—'} · {f.country_code ?? '—'}</span>
+                  <span className="row-title">{f.actor1_code} → {f.actor2_code}{f.country_code ? ` · ${f.country_code}` : ''}</span>
                   <span className="row-sub">{f.num_mentions} mentions · {timeAgo(f.ingested_at ?? f.event_date)} ago</span>
                 </span>
               </a>
