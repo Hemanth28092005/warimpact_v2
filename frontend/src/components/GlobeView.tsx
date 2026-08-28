@@ -13,6 +13,7 @@ import {
   IntelRoute,
 } from "../types";
 import { greatCircle, showPopup } from "../utils/geo";
+import { getIndiaPortName } from "../utils/format";
 
 interface GlobeViewProps {
   boundariesData?: { iso_a3: string; geojson: object }[];
@@ -289,6 +290,7 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
               risk: r.risk_score,
               commodity: r.commodity_code,
               partner: r.partner_country,
+              port: getIndiaPortName(r.dest_lat, r.dest_long),
               choke: r.primary_chokepoint ?? "direct",
               color: r.risk_score >= 80 ? "#ef4444" : r.risk_score >= 60 ? "#f97316" : r.risk_score >= 35 ? "#eab308" : "#22d3ee",
             },
@@ -342,7 +344,11 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
           const handleRouteClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
             const f = e.features?.[0];
             if (!f) return;
-            showPopup(map, e.lngLat, `<div class="wm-pop"><span class="wm-pop-code">${f.properties?.commodity}</span> → ${f.properties?.partner}<br/>risk <b>${Number(f.properties?.risk).toFixed(1)}</b>/100<br/><span class="wm-pop-dim">via ${f.properties?.choke ?? "direct corridor"}</span></div>`);
+            showPopup(
+              map,
+              e.lngLat,
+              `<div class="wm-pop"><span class="wm-pop-code">${f.properties?.commodity}</span><br/>${f.properties?.partner} ⇄ <b>${f.properties?.port || "India Gateway"}</b><br/>risk <b>${Number(f.properties?.risk).toFixed(1)}</b>/100<br/><span class="wm-pop-dim">via ${f.properties?.choke ?? "direct corridor"}</span></div>`
+            );
           };
           map.on("click", "route-lines-base", handleRouteClick);
           map.on("click", "route-lines-active", handleRouteClick);

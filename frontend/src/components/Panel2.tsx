@@ -1,6 +1,6 @@
 import { useUIStore } from '../store';
 import type { Chokepoint, TradeRoute, AggressionPair, CascadePair } from '../types';
-import { timeAgo } from '../utils/format';
+import { timeAgo, getIndiaPortName } from '../utils/format';
 import { CASCADE_COUNTRIES } from '../types';
 
 interface Panel2Props {
@@ -121,8 +121,8 @@ export function Panel2({ scoresArr, chokepoints, aggression, cascade, routes }: 
               >
                 <span className={`sev-tag ${r.risk_score >= 70 ? 'crit' : r.risk_score >= 45 ? 'high' : 'mid'}`}>{r.risk_score.toFixed(0)}</span>
                 <span className="row-main">
-                  <span className="row-title">{r.commodity_code} · IND → {r.partner_country}</span>
-                  <span className="row-sub">via {r.primary_chokepoint ?? 'direct lane'}</span>
+                  <span className="row-title">{r.commodity_code} · {r.partner_country} → {getIndiaPortName(r.dest_lat, r.dest_long)}</span>
+                  <span className="row-sub">via {r.primary_chokepoint ?? 'direct corridor'} · Risk: {r.risk_score.toFixed(1)}/100</span>
                 </span>
               </div>
             ))}
