@@ -1252,18 +1252,6 @@ const ensureNavalIcon = (map: maplibregl.Map) => {
       <div className="globe-atmosphere-glow" />
 
       <div className="map-overlays">
-        <div className="win-chips">
-          {WINDOWS_H.map((h) => (
-            <button
-              key={h}
-              className={windowH === h ? "chip active" : "chip"}
-              onClick={() => setWindowH(h)}
-            >
-              {h === 168 ? "7d" : `${h}h`}
-            </button>
-          ))}
-        </div>
-
         <div className="layers-panel">
           <div className="layers-head">
             <span>INTEL LAYERS</span>

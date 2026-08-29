@@ -1,6 +1,5 @@
 import { useUIStore } from '../store';
-import type { Region, MapTheme, Commodity } from '../types';
-import { REGIONS, WINDOWS_H } from '../types';
+import type { Commodity } from '../types';
 import { fmtPct } from '../utils/format';
 
 interface SitBarProps {
@@ -13,7 +12,6 @@ interface SitBarProps {
 
 export function SitBar({ escalationsCount, govActionsCount, flightsCount, chokeAlertsCount, commodities }: SitBarProps) {
   const { 
-    region, setRegion, windowH, setWindowH,
     mapTheme, setMapTheme, view3d, setView3d, autoRotate, setAutoRotate
   } = useUIStore();
 
@@ -39,13 +37,6 @@ export function SitBar({ escalationsCount, govActionsCount, flightsCount, chokeA
           <button className={view3d ? 'vt active' : 'vt'} onClick={() => setView3d(true)}>3D</button>
         </span>
         <button className={`orbit-btn ${autoRotate ? 'active' : ''}`} onClick={() => setAutoRotate(!autoRotate)} title="Auto-rotate Globe Orbit">↻ ORBIT</button>
-        <div className="win-chips">
-          {WINDOWS_H.map((h) => (
-            <button key={h} className={windowH === h ? 'chip active' : 'chip'} onClick={() => setWindowH(h)}>
-              {h === 168 ? '7d' : `${h}h`}
-            </button>
-          ))}
-        </div>
       </span>
     </div>
   );
