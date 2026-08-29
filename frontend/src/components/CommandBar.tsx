@@ -17,6 +17,8 @@ export function CommandBar({ defconLevel, clock: propClock }: CommandBarProps) {
     setShowBrief,
     showTv,
     setShowTv,
+    showSage,
+    setShowSage,
     selectedPort,
     setSelectedPort,
     mapRef,
@@ -36,14 +38,19 @@ export function CommandBar({ defconLevel, clock: propClock }: CommandBarProps) {
 
   return (
     <header className="cmdbar">
-      <div className="cmd-left">
+      <div className="cmd-left" title="S.A.G.E — Strategic Advisory & Geopolitical Evaluation">
         <span className="cmd-globe">◍</span>
-        <span className="cmd-word">WAR</span>
-        <span className="cmd-sep">·</span>
-        <span className="cmd-word cmd-accent">MONITOR</span>
-        <span className="cmd-ver">v0.4.0</span>
+        <span className="cmd-word">S·A·G·E</span>
+        <span className="cmd-ver">v1.0</span>
       </div>
       <div className="cmd-right">
+        <button
+          className={`cmd-btn sage-btn ${showSage ? 'active' : ''}`}
+          onClick={() => setShowSage(!showSage)}
+          title="S.A.G.E AI — Strategic Advisory & Geopolitical Evaluation"
+        >
+          <span className="sage-spark">🤖</span> S.A.G.E AI
+        </button>
         <button className={`cmd-btn brief-btn ${showBrief ? 'active' : ''}`} onClick={() => setShowBrief(true)}>
           <span className="brief-spark">✦</span> AI BRIEF
         </button>

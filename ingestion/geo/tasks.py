@@ -6,7 +6,7 @@ import logging
 
 from celery import shared_task  # type: ignore[import-untyped]
 
-from ingestion.geo import flights, intel_seed, seismic
+from ingestion.geo import flights, intel_seed, naval_seed, seismic
 
 logger = logging.getLogger(__name__)
 
@@ -42,3 +42,14 @@ def run_military_flights() -> dict[str, int]:
 )
 def run_intel_seed() -> dict[str, int]:
     return intel_seed.run_intel_seed_sync()
+
+
+@shared_task(
+    name="ingestion.geo.tasks.run_naval_fleets",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    max_retries=2,
+    soft_time_limit=60,
+)
+def run_naval_fleets() -> dict[str, int]:
+    return naval_seed.run_naval_sync()

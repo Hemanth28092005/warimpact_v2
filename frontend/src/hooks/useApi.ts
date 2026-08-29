@@ -13,11 +13,15 @@ import type {
   TradeRoute,
   AggressionPair,
   Flight,
+  NavalFleet,
   IntelSite,
   IntelRoute,
   WorldBrief,
   CiiScore,
   Alert,
+  SageChatRequest,
+  SageChatResponse,
+  SageSuggestion,
 } from '../types';
 
 async function api<T>(path: string): Promise<T> {
@@ -79,6 +83,7 @@ export function useDashboardData() {
         routes,
         aggression,
         flights,
+        navalFleets,
         intel,
       ] = await Promise.all([
         api<Commodity[]>('/api/v1/markets/commodities'),
@@ -91,6 +96,7 @@ export function useDashboardData() {
         api<TradeRoute[]>('/api/v1/dashboard/trade-routes'),
         api<{ pairs: AggressionPair[] }>('/api/v1/aggression/matrix'),
         api<Flight[]>('/api/v1/events/flights?limit=500'),
+        api<NavalFleet[]>('/api/v1/events/naval'),
         api<{ sites: IntelSite[]; routes: IntelRoute[] }>('/api/v1/events/intel'),
       ]);
 
@@ -105,6 +111,7 @@ export function useDashboardData() {
         routes,
         aggression: aggression.pairs ?? [],
         flights,
+        navalFleets,
         intelSites: intel.sites ?? [],
         intelRoutes: intel.routes ?? [],
       };
@@ -138,5 +145,40 @@ export function useAlerts() {
     queryFn: () => api<Alert[]>('/api/v1/alerts/recent?limit=50'),
     refetchInterval: 15000,
     staleTime: 5000,
+  });
+}
+
+export async function sendSageMessage(payload: SageChatRequest): Promise<SageChatResponse> {
+  const res = await fetch('/api/v1/sage/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.detail || `Sage request failed (${res.status})`);
+  }
+  return res.json() as Promise<SageChatResponse>;
+}
+
+export function useSageContext(enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['sage-context'],
+    queryFn: () => api<Record<string, unknown>>('/api/v1/sage/context'),
+    enabled,
+    refetchInterval: 30000,
+    staleTime: 15000,
+  });
+}
+
+export function useSageSuggestions(enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['sage-suggestions'],
+    queryFn: async () => {
+      const res = await api<{ categories: SageSuggestion[] }>('/api/v1/sage/suggestions');
+      return res.categories;
+    },
+    enabled,
+    staleTime: Infinity,
   });
 }

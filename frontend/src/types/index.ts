@@ -89,6 +89,8 @@ export type TradeRoute = {
   origin_long: number;
   dest_lat: number;
   dest_long: number;
+  dest_port_name?: string | null;
+  dest_port_code?: string | null;
   risk_score: number;
 };
 
@@ -209,9 +211,27 @@ export const TV_CHANNELS = [
   { id: 'euronews', name: 'EURONEWS', url: 'https://www.youtube-nocookie.com/embed/live_stream?channel=UCSrZ3UV4jOidv8ppoVuvW9Q&autoplay=1&mute=1' },
 ] as const;
 
+export type NavalFleet = {
+  code: string;
+  name: string;
+  country_code: string;
+  flag_country: string;
+  fleet_type: string;
+  flagship: string;
+  composition: string | null;
+  operational_area: string;
+  latitude: number;
+  longitude: number;
+  status: string;
+  threat_level: string;
+  mission_brief: string | null;
+  source_citation: string | null;
+  last_reported_at: string;
+};
+
 export type Panel1Tab = 'escalations' | 'gov_actions' | 'protests';
 export type Panel2Tab = 'cii' | 'chokepoints' | 'aggression' | 'cascade' | 'routes';
-export type Panel3Tab = 'odds' | 'headlines' | 'markets' | 'flights' | 'seismic';
+export type Panel3Tab = 'odds' | 'headlines' | 'markets' | 'flights' | 'fleets' | 'seismic';
 export type MapTheme = 'satellite' | 'dark';
 
 export type LayerState = {
@@ -221,6 +241,7 @@ export type LayerState = {
   chokes: boolean;
   protests: boolean;
   flights: boolean;
+  naval: boolean;
   bases: boolean;
   nuclear: boolean;
   spaceports: boolean;
@@ -234,5 +255,35 @@ export type LoadedState = {
   protests: boolean;
   routes: boolean;
   flights: boolean;
+  naval: boolean;
   intel: boolean;
 };
+
+export interface SageChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+export interface SageChatRequest {
+  message: string;
+  history: SageChatMessage[];
+}
+
+export interface SageTelemetryHighlight {
+  label: string;
+  value: string;
+}
+
+export interface SageChatResponse {
+  reply: string;
+  telemetry_highlights: SageTelemetryHighlight[];
+  suggested_followups: string[];
+  model_used: string;
+  latency_ms: number;
+}
+
+export interface SageSuggestion {
+  category: string;
+  emoji: string;
+  prompts: string[];
+}

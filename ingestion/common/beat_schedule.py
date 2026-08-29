@@ -91,4 +91,8 @@ BEAT_SCHEDULE: dict[str, dict[str, Any]] = {
         "task": "ingestion.markets.tasks.run_prediction_markets",
         "schedule": timedelta(hours=1),
     },
+    "ingestion-run-naval-fleets": {
+        "task": "ingestion.geo.tasks.run_naval_fleets",
+        "schedule": timedelta(minutes=30),
+    },
 }

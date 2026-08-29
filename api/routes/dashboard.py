@@ -41,6 +41,8 @@ class TradeRouteResponse(BaseModel):
     origin_long: float = Field(..., description="Origin longitude coordinate")
     dest_lat: float = Field(..., description="Destination latitude coordinate (India)")
     dest_long: float = Field(..., description="Destination longitude coordinate (India)")
+    dest_port_name: str = Field(..., description="Resolved destination landing port name (e.g. Vadinar Port, Gujarat)")
+    dest_port_code: str = Field(..., description="Resolved destination landing port code (e.g. IN-VAD)")
     risk_score: float = Field(..., ge=0.0, le=100.0, description="Composite route risk score [0.0, 100.0]")
     updated_at: str = Field(..., description="ISO timestamp of last calculation")
 
@@ -209,7 +211,8 @@ async def get_recent_alerts(
                     ST_MakePoint(cp.long, cp.lat)::geography,
                     100000
                 )
-                WHERE mf.observed_at >= NOW() - INTERVAL '30 minutes'
+                WHERE mf.observed_at >= NOW() - INTERVAL '2 hours'
+                   OR mf.observed_at >= (SELECT MAX(observed_at) FROM military_flights) - interval '30 minutes'
                 GROUP BY cp.code
                 HAVING COUNT(*) >= 5
                 """
@@ -314,6 +317,38 @@ async def get_chokepoints() -> list[dict[str, Any]]:
     return results
 
 
+def _resolve_dest_port(dest_lat: float, dest_long: float) -> tuple[str, str]:
+    if abs(dest_lat - 22.45) < 0.2 and abs(dest_long - 69.80) < 0.2:
+        return "Vadinar / Sikka Port (Gujarat)", "IN-VAD"
+    if abs(dest_lat - 21.1086) < 0.2 and abs(dest_long - 72.6358) < 0.2:
+        return "Hazira / Surat Port (Gujarat)", "IN-HZR"
+    if abs(dest_lat - 22.7441) < 0.2 and abs(dest_long - 69.7025) < 0.2:
+        return "Mundra Commercial Port (Gujarat)", "IN-MUN"
+    if abs(dest_lat - 22.8360) < 0.2 and abs(dest_long - 70.2185) < 0.2:
+        return "Kandla (Deendayal) Port (Gujarat)", "IN-IXY"
+    if abs(dest_lat - 21.7000) < 0.2 and abs(dest_long - 72.5800) < 0.2:
+        return "Dahej Chemical & LNG Port (Gujarat)", "IN-DHJ"
+    if abs(dest_lat - 18.9500) < 0.2 and abs(dest_long - 72.9500) < 0.2:
+        return "Mumbai JNPT Port (Maharashtra)", "IN-BOM"
+    if abs(dest_lat - 15.4167) < 0.2 and abs(dest_long - 73.8000) < 0.2:
+        return "Mormugao Port (Goa)", "IN-MRM"
+    if abs(dest_lat - 9.9656) < 0.2 and abs(dest_long - 76.2711) < 0.2:
+        return "Cochin Port / Kochi LNG (Kerala)", "IN-COK"
+    if abs(dest_lat - 8.7533) < 0.2 and abs(dest_long - 78.1633) < 0.2:
+        return "Tuticorin Port [V.O.C] (Tamil Nadu)", "IN-TCR"
+    if abs(dest_lat - 13.0844) < 0.2 and abs(dest_long - 80.2980) < 0.2:
+        return "Chennai Port & Ennore (Tamil Nadu)", "IN-MAA"
+    if abs(dest_lat - 16.9890) < 0.2 and abs(dest_long - 82.2874) < 0.2:
+        return "Kakinada Deepwater Port (Andhra Pradesh)", "IN-KID"
+    if abs(dest_lat - 17.6868) < 0.2 and abs(dest_long - 83.2986) < 0.2:
+        return "Visakhapatnam Port (Andhra Pradesh)", "IN-VTZ"
+    if abs(dest_lat - 20.2644) < 0.2 and abs(dest_long - 86.6085) < 0.2:
+        return "Paradip Port (Odisha)", "IN-PRT"
+    if abs(dest_lat - 22.0333) < 0.2 and abs(dest_long - 88.0833) < 0.2:
+        return "Haldia / Kolkata Port (West Bengal)", "IN-HLD"
+    return "Indian Maritime Port", "IN-GEN"
+
+
 @router.get("/trade-routes", response_model=list[TradeRouteResponse])
 async def get_trade_routes(
     commodity_code: Optional[str] = Query(None, description="Filter by specific commodity code"),
@@ -343,6 +378,9 @@ async def get_trade_routes(
 
     results = []
     for r in rows:
+        d_lat = float(r[6])
+        d_long = float(r[7])
+        p_name, p_code = _resolve_dest_port(d_lat, d_long)
         results.append(
             {
                 "id": int(r[0]),
@@ -351,8 +389,10 @@ async def get_trade_routes(
                 "primary_chokepoint": r[3],
                 "origin_lat": float(r[4]),
                 "origin_long": float(r[5]),
-                "dest_lat": float(r[6]),
-                "dest_long": float(r[7]),
+                "dest_lat": d_lat,
+                "dest_long": d_long,
+                "dest_port_name": p_name,
+                "dest_port_code": p_code,
                 "risk_score": float(r[8]),
                 "updated_at": r[9].isoformat() if hasattr(r[9], "isoformat") else str(r[9]),
             }

@@ -25,6 +25,7 @@ import { BottomPanels } from "./components/BottomPanels";
 import { TVPanel } from "./components/TVPanel";
 import { AIBriefModal } from "./components/AIBriefModal";
 import { AlertsPanel } from "./components/AlertsPanel";
+import { SageModal } from "./components/SageModal";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -71,6 +72,7 @@ function WarMonitorApp(): JSX.Element {
   const routes = dashboardData?.routes ?? [];
   const aggression = dashboardData?.aggression ?? [];
   const flights = dashboardData?.flights ?? [];
+  const navalFleets = dashboardData?.navalFleets ?? [];
   const intelSites = dashboardData?.intelSites ?? [];
   const intelRoutes = dashboardData?.intelRoutes ?? [];
 
@@ -132,6 +134,7 @@ function WarMonitorApp(): JSX.Element {
     protests: !dashLoading && protests.length > 0,
     routes: !dashLoading && routes.length > 0,
     flights: !dashLoading && flights.length > 0,
+    naval: !dashLoading && navalFleets.length > 0,
     intel: !dashLoading && intelSites.length > 0,
   };
 
@@ -155,6 +158,7 @@ function WarMonitorApp(): JSX.Element {
         chokepoints={chokepoints}
         routes={routes}
         flights={flights}
+        navalFleets={navalFleets}
         intelSites={intelSites}
         intelRoutes={intelRoutes}
         loaded={loaded}
@@ -171,6 +175,8 @@ function WarMonitorApp(): JSX.Element {
         onRefresh={() => refetchBrief()}
       />
 
+      <SageModal />
+
       <BottomPanels
         feed={distinctFeed}
         govActions={govActions}
@@ -185,6 +191,7 @@ function WarMonitorApp(): JSX.Element {
         commodities={commodities}
         freight={freight}
         flights={flights}
+        navalFleets={navalFleets}
         quakesNear={quakesNear}
       />
     </div>

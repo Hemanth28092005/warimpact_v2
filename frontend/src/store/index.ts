@@ -33,6 +33,9 @@ interface UIState {
   showTv: boolean;
   tvChannel: string;
   tvMinimized: boolean;
+  showSage: boolean;
+  sageMinimized: boolean;
+  sageDraftPrompt: string | null;
 
   // Layers
   layers: LayerState;
@@ -62,6 +65,9 @@ interface UIState {
   setShowTv: (v: boolean) => void;
   setTvChannel: (c: string) => void;
   setTvMinimized: (v: boolean) => void;
+  setShowSage: (v: boolean) => void;
+  setSageMinimized: (v: boolean) => void;
+  openSageWithPrompt: (prompt: string) => void;
   toggleLayer: (k: keyof LayerState) => void;
   setLayers: (layers: LayerState) => void;
   setLoaded: (k: keyof LoadedState, v: boolean) => void;
@@ -76,6 +82,7 @@ const defaultLayers: LayerState = {
   chokes: true,
   protests: false,
   flights: true,
+  naval: true,
   bases: true,
   nuclear: true,
   spaceports: false,
@@ -89,6 +96,7 @@ const defaultLoaded: LoadedState = {
   protests: false,
   routes: false,
   flights: false,
+  naval: false,
   intel: false,
 };
 
@@ -110,6 +118,9 @@ export const useUIStore = create<UIState>()(
       showTv: false,
       tvChannel: 'aljazeera',
       tvMinimized: false,
+      showSage: false,
+      sageMinimized: false,
+      sageDraftPrompt: null,
       layers: defaultLayers,
       loaded: defaultLoaded,
       alerts: [],
@@ -131,6 +142,9 @@ export const useUIStore = create<UIState>()(
       setShowTv: (v) => set({ showTv: v }),
       setTvChannel: (c) => set({ tvChannel: c }),
       setTvMinimized: (v) => set({ tvMinimized: v }),
+      setShowSage: (v) => set({ showSage: v }),
+      setSageMinimized: (v) => set({ sageMinimized: v }),
+      openSageWithPrompt: (prompt) => set({ showSage: true, sageDraftPrompt: prompt, sageMinimized: false }),
       toggleLayer: (k) =>
         set((s) => ({
           layers: { ...(s.layers || defaultLayers), [k]: !(s.layers || defaultLayers)[k] },

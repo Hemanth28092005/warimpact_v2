@@ -15,11 +15,12 @@ from api.routes.events import router as events_router
 from api.routes.health import router as health_router
 from api.routes.live_feed import router as live_feed_router
 from api.routes.markets import router as markets_router
+from api.routes.sage import router as sage_router
 
 app = FastAPI(
-    title="War Impact Platform API",
-    description="Global Geopolitical Instability and Trade Impact Platform REST API",
-    version="0.1.0",
+    title="S.A.G.E Platform API",
+    description="S.A.G.E — Strategic Advisory & Geopolitical Evaluation Platform REST API",
+    version="1.0.0",
 )
 
 app.add_middleware(
@@ -40,9 +41,10 @@ app.include_router(markets_router)
 app.include_router(events_router)
 app.include_router(brief_router)
 app.include_router(alerts_router)
+app.include_router(sage_router)
 app.include_router(health_router)
 
 
 @app.get("/")
 async def root() -> dict[str, str]:
-    return {"message": "War Impact Platform API v0.1.0 operational"}
+    return {"message": "S.A.G.E Platform API v1.0.0 operational"}

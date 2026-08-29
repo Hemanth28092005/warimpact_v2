@@ -6,6 +6,7 @@ export function LayersPanel() {
   const layerConfig = [
     { key: 'cii' as const, label: 'CONFLICT (CII)' },
     { key: 'flights' as const, label: 'MILITARY FLIGHTS' },
+    { key: 'naval' as const, label: 'WARSHIPS & FLEETS' },
     { key: 'bases' as const, label: 'MILITARY BASES' },
     { key: 'nuclear' as const, label: 'NUCLEAR SITES' },
     { key: 'spaceports' as const, label: 'SPACEPORTS' },
@@ -20,7 +21,7 @@ export function LayersPanel() {
     <div className="layers-panel">
       <div className="layers-head">
         <span>INTEL LAYERS</span>
-        <span className="layers-q">10</span>
+        <span className="layers-q">11</span>
       </div>
       {layerConfig.map(({ key, label }) => (
         <label key={key} className="layer-row">

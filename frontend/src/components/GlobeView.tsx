@@ -9,6 +9,7 @@ import {
   Chokepoint,
   TradeRoute,
   Flight,
+  NavalFleet,
   IntelSite,
   IntelRoute,
 } from "../types";
@@ -23,6 +24,7 @@ interface GlobeViewProps {
   chokepoints?: Chokepoint[];
   routes?: TradeRoute[];
   flights?: Flight[];
+  navalFleets?: NavalFleet[];
   intelSites?: IntelSite[];
   intelRoutes?: IntelRoute[];
   loaded?: {
@@ -32,6 +34,7 @@ interface GlobeViewProps {
     protests: boolean;
     routes: boolean;
     flights: boolean;
+    naval: boolean;
     intel: boolean;
   };
 }
@@ -80,6 +83,7 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
   chokepoints = [],
   routes = [],
   flights = [],
+  navalFleets = [],
   intelSites = [],
   intelRoutes = [],
   loaded = {
@@ -89,6 +93,7 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
     protests: true,
     routes: true,
     flights: true,
+    naval: true,
     intel: true,
   },
 }) => {
@@ -366,20 +371,35 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
           (map.getSource("trade-routes") as maplibregl.GeoJSONSource).setData(routeData as never);
         }
 
-        // 3b. Indian Commercial Ports (Designated Trade Gateways)
+        // 3b. Indian Commercial Destination Landing Ports (Designated Trade Gateways)
         const portData = {
           type: "FeatureCollection" as const,
-          features: INDIAN_PORTS.map((p) => ({
-            type: "Feature" as const,
-            geometry: { type: "Point" as const, coordinates: [p.long, p.lat] },
-            properties: {
-              code: p.code,
-              name: p.name,
-              state: p.state,
-              commodities: p.commodities,
-              trafficType: p.trafficType,
-            },
-          })),
+          features: INDIAN_PORTS.map((p) => {
+            const landingRoutes = routes.filter((r) => getIndiaPortCode(r.dest_lat, r.dest_long) === p.code);
+            const commodities = Array.from(new Set(landingRoutes.map((r) => r.commodity_code.replace(/_/g, " ")))).join(", ") || p.commodities;
+            const partners = Array.from(new Set(landingRoutes.map((r) => r.partner_country))).join(", ") || "Global Trade";
+            const chokes = Array.from(new Set(landingRoutes.map((r) => r.primary_chokepoint).filter(Boolean))).join(", ") || "Direct Coastal";
+            const avgRisk = landingRoutes.length > 0
+              ? (landingRoutes.reduce((acc, r) => acc + r.risk_score, 0) / landingRoutes.length).toFixed(1)
+              : "32.0";
+
+            return {
+              type: "Feature" as const,
+              geometry: { type: "Point" as const, coordinates: [p.long, p.lat] },
+              properties: {
+                code: p.code,
+                name: p.name,
+                state: p.state,
+                commodities: commodities,
+                partners: partners,
+                chokes: chokes,
+                avgRisk: avgRisk,
+                landingCount: landingRoutes.length,
+                label: landingRoutes.length > 0 ? `⚓ ${p.name} (${landingRoutes.length})` : `⚓ ${p.name}`,
+                trafficType: p.trafficType,
+              },
+            };
+          }),
         };
         if (!map.getSource("india-ports")) {
           map.addSource("india-ports", { type: "geojson", data: portData as never });
@@ -391,22 +411,22 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
               "circle-radius": [
                 "case",
                 ["==", ["get", "code"], selectedPort],
-                ["interpolate", ["linear"], ["zoom"], 1, 9, 4, 15, 8, 22],
-                ["interpolate", ["linear"], ["zoom"], 1, 4.5, 4, 7.5, 8, 13],
+                ["interpolate", ["linear"], ["zoom"], 1, 10, 4, 18, 8, 26],
+                ["interpolate", ["linear"], ["zoom"], 1, 5.0, 4, 9.0, 8, 15],
               ],
               "circle-color": [
                 "case",
                 ["==", ["get", "code"], selectedPort],
                 "#00f0ff",
-                "#38bdf8",
+                "#22d3ee",
               ],
               "circle-opacity": [
                 "case",
                 ["==", ["get", "code"], selectedPort],
-                0.9,
-                0.5,
+                0.95,
+                0.6,
               ],
-              "circle-blur": 0.4,
+              "circle-blur": 0.35,
             },
           });
           map.addLayer({
@@ -417,8 +437,8 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
               "circle-radius": [
                 "case",
                 ["==", ["get", "code"], selectedPort],
-                ["interpolate", ["linear"], ["zoom"], 1, 4.5, 4, 6.5, 8, 9.0],
-                ["interpolate", ["linear"], ["zoom"], 1, 3.0, 4, 4.5, 8, 7.0],
+                ["interpolate", ["linear"], ["zoom"], 1, 5.0, 4, 7.5, 8, 10.0],
+                ["interpolate", ["linear"], ["zoom"], 1, 3.5, 4, 5.0, 8, 8.0],
               ],
               "circle-color": [
                 "case",
@@ -441,9 +461,9 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
             type: "symbol",
             source: "india-ports",
             layout: {
-              "text-field": ["get", "name"],
+              "text-field": ["get", "label"],
               "text-size": ["interpolate", ["linear"], ["zoom"], 1, 8, 4, 10, 8, 12],
-              "text-offset": [0, 1.1],
+              "text-offset": [0, 1.2],
               "text-anchor": "top",
               "text-allow-overlap": false,
               "text-ignore-placement": false,
@@ -456,17 +476,30 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
                 "#38bdf8",
               ],
               "text-halo-color": "#020617",
-              "text-halo-width": 1.8,
+              "text-halo-width": 2.0,
             },
           });
 
           const handlePortMarkerClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
             const f = e.features?.[0];
             if (!f) return;
+            const props = f.properties || {};
+            const riskVal = Number(props.avgRisk) || 0;
+            const riskColor = riskVal >= 60 ? "#ef4444" : riskVal >= 40 ? "#f97316" : "#22c55e";
+
             showPopup(
               map,
               e.lngLat,
-              `<div class="wm-pop"><span class="wm-pop-code">${f.properties?.code}</span> ${f.properties?.state}<br/><b>${f.properties?.name}</b><br/><span class="wm-pop-dim">Traffic: ${f.properties?.commodities}<br/>${f.properties?.trafficType}</span></div>`
+              `<div class="wm-pop" style="min-width: 240px; font-family: monospace;">
+                <div style="font-size: 9px; font-weight: 700; color: #38bdf8; letter-spacing: 0.8px; margin-bottom: 2px;">⚓ DESTINATION LANDING PORT</div>
+                <div style="font-size: 13px; font-weight: 700; color: #f8fafc; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px; margin-bottom: 6px;">${props.name} <span style="font-size: 10px; color: #94a3b8;">[${props.code}]</span></div>
+                <div style="font-size: 10.5px; color: #93c5fd; margin-bottom: 4px;"><b>State:</b> ${props.state} · <i>${props.trafficType}</i></div>
+                <div style="font-size: 10.5px; color: #e2e8f0; margin-bottom: 4px;"><b>Active Landings:</b> <span style="color: #00f0ff; font-weight: 700;">${props.landingCount} Inbound Trade Routes</span></div>
+                <div style="font-size: 10px; color: #cbd5e1; margin-bottom: 4px; line-height: 1.35;"><b>Landing Commodities:</b><br/><span style="color: #fef08a;">${props.commodities}</span></div>
+                <div style="font-size: 10px; color: #cbd5e1; margin-bottom: 4px;"><b>Origin Partners:</b> ${props.partners}</div>
+                <div style="font-size: 10px; color: #cbd5e1; margin-bottom: 4px;"><b>Avg Route Risk:</b> <b style="color: ${riskColor};">${props.avgRisk}/100</b></div>
+                <div style="font-size: 9px; color: #64748b; margin-top: 4px; border-top: 1px dashed rgba(255,255,255,0.08); padding-top: 4px;">Transit Corridors: ${props.chokes}</div>
+              </div>`
             );
           };
           map.on("click", "port-circle-outer", handlePortMarkerClick);
@@ -474,6 +507,76 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
         } else if (map.getSource("india-ports")) {
           (map.getSource("india-ports") as maplibregl.GeoJSONSource).setData(portData as never);
         }
+
+const ensurePlaneIcon = (map: maplibregl.Map) => {
+  if (map.hasImage("plane-icon")) return;
+
+  const size = 48;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  ctx.clearRect(0, 0, size, size);
+
+  // Subtle glow
+  ctx.shadowColor = "rgba(0, 229, 255, 0.9)";
+  ctx.shadowBlur = 8;
+
+  // Draw military jet silhouette
+  ctx.fillStyle = "#00e5ff";
+  ctx.strokeStyle = "#020617";
+  ctx.lineWidth = 2.4;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+
+  ctx.beginPath();
+  // Nose
+  ctx.moveTo(24, 4);
+  // Right wing
+  ctx.lineTo(27, 16);
+  ctx.lineTo(44, 25);
+  ctx.lineTo(44, 28);
+  ctx.lineTo(27, 26);
+  // Right stabilizer
+  ctx.lineTo(27, 36);
+  ctx.lineTo(36, 42);
+  ctx.lineTo(36, 45);
+  // Tail center
+  ctx.lineTo(24, 42);
+  // Left stabilizer
+  ctx.lineTo(12, 45);
+  ctx.lineTo(12, 42);
+  ctx.lineTo(21, 36);
+  // Left wing
+  ctx.lineTo(21, 26);
+  ctx.lineTo(4, 28);
+  ctx.lineTo(4, 25);
+  ctx.lineTo(21, 16);
+  ctx.closePath();
+
+  ctx.fill();
+  ctx.stroke();
+
+  // Cockpit canopy highlight
+  ctx.beginPath();
+  ctx.moveTo(24, 11);
+  ctx.lineTo(24, 20);
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+  ctx.stroke();
+
+  const imgData = ctx.getImageData(0, 0, size, size);
+  try {
+    if (!map.hasImage("plane-icon")) {
+      map.addImage("plane-icon", imgData, { pixelRatio: 2 });
+    }
+  } catch (err) {
+    console.warn("Error adding plane icon:", err);
+  }
+};
 
         // 4. Military Flights
         const flightData = {
@@ -493,20 +596,32 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
           })),
         };
         if (!map.getSource("military-flights") && loaded.flights && flights.length > 0) {
+          ensurePlaneIcon(map);
           map.addSource("military-flights", { type: "geojson", data: flightData as never });
           map.addLayer({
-            id: "flight-circles",
+            id: "flight-glow",
             type: "circle",
             source: "military-flights",
             paint: {
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 2.5, 4, 4, 8, 7],
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 2, 4, 3.5, 8, 6],
               "circle-color": "#00e5ff",
-              "circle-stroke-color": "#ffffff",
-              "circle-stroke-width": 0.8,
-              "circle-opacity": 0.95,
+              "circle-opacity": 0.45,
+              "circle-blur": 0.6,
             },
           });
-          map.on("click", "flight-circles", (e) => {
+          map.addLayer({
+            id: "flight-icons",
+            type: "symbol",
+            source: "military-flights",
+            layout: {
+              "icon-image": "plane-icon",
+              "icon-size": ["interpolate", ["linear"], ["zoom"], 1, 0.45, 3, 0.65, 6, 0.85, 9, 1.1],
+              "icon-allow-overlap": true,
+              "icon-ignore-placement": true,
+              "icon-rotation-alignment": "map",
+            },
+          });
+          map.on("click", "flight-icons", (e) => {
             const f = e.features?.[0];
             if (!f) return;
             showPopup(map, e.lngLat, `
@@ -517,8 +632,191 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
               </div>
             `);
           });
+          map.on("mouseenter", "flight-icons", () => {
+            map.getCanvas().style.cursor = "pointer";
+          });
+          map.on("mouseleave", "flight-icons", () => {
+            map.getCanvas().style.cursor = "";
+          });
         } else if (map.getSource("military-flights")) {
+          ensurePlaneIcon(map);
           (map.getSource("military-flights") as maplibregl.GeoJSONSource).setData(flightData as never);
+        }
+
+const ensureNavalIcon = (map: maplibregl.Map) => {
+  if (map.hasImage("naval-icon")) return;
+
+  const size = 48;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  ctx.clearRect(0, 0, size, size);
+
+  // Tactical glow
+  ctx.shadowColor = "rgba(56, 189, 248, 0.9)";
+  ctx.shadowBlur = 8;
+
+  // Warship hull drawing
+  ctx.fillStyle = "#38bdf8";
+  ctx.strokeStyle = "#020617";
+  ctx.lineWidth = 2.4;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+
+  ctx.beginPath();
+  // Bow (Nose of warship)
+  ctx.moveTo(24, 4);
+  // Starboard bow flare
+  ctx.lineTo(32, 14);
+  // Starboard hull
+  ctx.lineTo(33, 38);
+  // Starboard stern quarter
+  ctx.lineTo(30, 44);
+  // Transom
+  ctx.lineTo(18, 44);
+  // Port stern quarter
+  ctx.lineTo(15, 38);
+  // Port hull
+  ctx.lineTo(16, 14);
+  ctx.closePath();
+
+  ctx.fill();
+  ctx.stroke();
+
+  // Superstructure / Runway line
+  ctx.beginPath();
+  ctx.moveTo(22, 12);
+  ctx.lineTo(22, 38);
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+  ctx.stroke();
+
+  // Radar / Bridge island
+  ctx.fillStyle = "#f59e0b";
+  ctx.fillRect(26, 20, 5, 10);
+  ctx.strokeStyle = "#020617";
+  ctx.lineWidth = 1.2;
+  ctx.strokeRect(26, 20, 5, 10);
+
+  const imgData = ctx.getImageData(0, 0, size, size);
+  try {
+    if (!map.hasImage("naval-icon")) {
+      map.addImage("naval-icon", imgData, { pixelRatio: 2 });
+    }
+  } catch (err) {
+    console.warn("Error adding naval icon:", err);
+  }
+};
+
+        // 4b. Strategic Naval Fleets & Strike Groups
+        const navalData = {
+          type: "FeatureCollection" as const,
+          features: navalFleets.map((nf) => ({
+            type: "Feature" as const,
+            geometry: { type: "Point" as const, coordinates: [nf.longitude, nf.latitude] },
+            properties: {
+              code: nf.code,
+              name: nf.name,
+              country_code: nf.country_code,
+              flag_country: nf.flag_country,
+              fleet_type: nf.fleet_type,
+              flagship: nf.flagship,
+              composition: nf.composition,
+              operational_area: nf.operational_area,
+              status: nf.status,
+              threat_level: nf.threat_level,
+              mission_brief: nf.mission_brief,
+              source_citation: nf.source_citation,
+            },
+          })),
+        };
+        if (!map.getSource("naval-fleets") && loaded.naval && navalFleets.length > 0) {
+          ensureNavalIcon(map);
+          map.addSource("naval-fleets", { type: "geojson", data: navalData as never });
+          map.addLayer({
+            id: "naval-fleet-glow",
+            type: "circle",
+            source: "naval-fleets",
+            paint: {
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 3.5, 4, 6, 8, 9],
+              "circle-color": [
+                "case",
+                ["==", ["get", "threat_level"], "critical"],
+                "#ef4444",
+                ["==", ["get", "threat_level"], "elevated"],
+                "#f59e0b",
+                "#38bdf8",
+              ],
+              "circle-opacity": 0.45,
+              "circle-blur": 0.6,
+            },
+          });
+          map.addLayer({
+            id: "naval-fleet-icons",
+            type: "symbol",
+            source: "naval-fleets",
+            layout: {
+              "icon-image": "naval-icon",
+              "icon-size": ["interpolate", ["linear"], ["zoom"], 1, 0.45, 3, 0.65, 6, 0.85, 9, 1.1],
+              "icon-allow-overlap": true,
+              "icon-ignore-placement": true,
+              "icon-rotation-alignment": "map",
+            },
+          });
+          map.addLayer({
+            id: "naval-fleet-labels",
+            type: "symbol",
+            source: "naval-fleets",
+            layout: {
+              "text-field": ["get", "flagship"],
+              "text-size": ["interpolate", ["linear"], ["zoom"], 1, 8, 4, 10, 8, 12],
+              "text-offset": [0, 1.3],
+              "text-anchor": "top",
+              "text-allow-overlap": false,
+              "text-ignore-placement": false,
+            },
+            paint: {
+              "text-color": "#38bdf8",
+              "text-halo-color": "#020617",
+              "text-halo-width": 1.5,
+            },
+          });
+
+          const handleNavalClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
+            const f = e.features?.[0];
+            if (!f) return;
+            showPopup(
+              map,
+              e.lngLat,
+              `
+              <div class="wm-pop">
+                <span class="wm-pop-code">${f.properties?.flagship}</span> (${f.properties?.country_code})<br/>
+                <b>${f.properties?.name}</b> · <span class="sev-tag ${f.properties?.threat_level === 'critical' ? 'crit' : f.properties?.threat_level === 'elevated' ? 'high' : 'mid'}">${String(f.properties?.status || '').toUpperCase()}</span><br/>
+                <span class="wm-pop-dim">
+                  Area: <b>${f.properties?.operational_area}</b><br/>
+                  ${f.properties?.composition ? `Units: ${f.properties?.composition}<br/>` : ''}
+                  ${f.properties?.mission_brief ? `${f.properties?.mission_brief}` : ''}
+                </span>
+              </div>
+            `
+            );
+          };
+
+          map.on("click", "naval-fleet-icons", handleNavalClick);
+          map.on("click", "naval-fleet-labels", handleNavalClick);
+          map.on("mouseenter", "naval-fleet-icons", () => {
+            map.getCanvas().style.cursor = "pointer";
+          });
+          map.on("mouseleave", "naval-fleet-icons", () => {
+            map.getCanvas().style.cursor = "";
+          });
+        } else if (map.getSource("naval-fleets")) {
+          ensureNavalIcon(map);
+          (map.getSource("naval-fleets") as maplibregl.GeoJSONSource).setData(navalData as never);
         }
 
         // 5. Strategic Intel Sites
@@ -740,7 +1038,11 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
         vis("port-pulse-glow", layers.routes);
         vis("port-circle-outer", layers.routes);
         vis("port-labels", layers.routes);
-        vis("flight-circles", layers.flights);
+        vis("flight-glow", layers.flights);
+        vis("flight-icons", layers.flights);
+        vis("naval-fleet-glow", layers.naval);
+        vis("naval-fleet-icons", layers.naval);
+        vis("naval-fleet-labels", layers.naval);
         vis("intel-bases-layer", layers.bases);
         vis("intel-nuclear-layer", layers.nuclear);
         vis("intel-spaceports-layer", layers.spaceports);
@@ -758,7 +1060,7 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
     } else {
       map.once("load", apply);
     }
-  }, [layers, quakes, protests, routes, flights, chokepoints, intelSites, intelRoutes, loaded, mapTheme, selectedPort]);
+  }, [layers, quakes, protests, routes, flights, navalFleets, chokepoints, intelSites, intelRoutes, loaded, mapTheme, selectedPort]);
 
   // 5. Moving Commodity Transport Lines Animation
   useEffect(() => {
@@ -978,6 +1280,11 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
             MILITARY FLIGHTS ({flights.length})
           </label>
           <label className="layer-row">
+            <input type="checkbox" checked={layers.naval} onChange={() => toggleLayer("naval")} />
+            <span className="checkmark" />
+            WARSHIPS & FLEETS ({navalFleets.length})
+          </label>
+          <label className="layer-row">
             <input type="checkbox" checked={layers.bases} onChange={() => toggleLayer("bases")} />
             <span className="checkmark" />
             MILITARY BASES
@@ -1023,7 +1330,18 @@ export const GlobeView: React.FC<GlobeViewProps> = ({
         <div className="legend-bar">
           <span className="lg-title">LEGEND</span>
           <span><i className="dot d-high" /> Alert</span>
-          <span><i className="dot d-flight" /> Mil Flight</span>
+          <span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="#00e5ff" style={{ verticalAlign: "-2px", marginRight: "2px" }}>
+              <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" />
+            </svg>
+            Mil Flight
+          </span>
+          <span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#38bdf8" style={{ verticalAlign: "-2px", marginRight: "2px" }}>
+              <path d="M20 21c-1.39 0-2.78-.47-4-1.32-2.44 1.71-5.56 1.71-8 0C6.78 20.53 5.39 21 4 21H2v2h2c1.38 0 2.74-.35 4-.99 2.52 1.29 5.48 1.29 8 0 1.26.65 2.62.99 4 .99h2v-2h-2zM3.95 19H4c1.6 0 3.02-.88 4-2 .98 1.12 2.4 2 4 2s3.02-.88 4-2c.98 1.12 2.4 2 4 2h.05l1.89-6.68c.08-.26.06-.54-.06-.78s-.33-.41-.6-.46L20 11V8c0-.55-.45-1-1-1h-5V4c0-.55-.45-1-1-1h-2c-.55 0-1 .45-1 1v3H5c-.55 0-1 .45-1 1v3l-1.33.28c-.27.05-.48.22-.6.46s-.14.52-.06.78L3.95 19zM6 9h12v2H6V9z" />
+            </svg>
+            Naval Fleet
+          </span>
           <span><i className="dot d-base" /> Base</span>
           <span><i className="dot d-nuc" /> Nuclear</span>
           <span><i className="dot d-space" /> Spaceport</span>

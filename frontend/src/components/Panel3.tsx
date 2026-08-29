@@ -1,5 +1,5 @@
 import { useUIStore } from '../store';
-import type { Prediction, Headline, Commodity, Freight, Flight, Quake } from '../types';
+import type { Prediction, Headline, Commodity, Freight, Flight, NavalFleet, Quake } from '../types';
 import { timeAgo, fmtPct } from '../utils/format';
 import { HEADLINE_REGIONS } from '../types';
 
@@ -9,10 +9,11 @@ interface Panel3Props {
   commodities: Commodity[];
   freight: Freight[];
   flights: Flight[];
+  navalFleets?: NavalFleet[];
   quakesNear: Quake[];
 }
 
-export function Panel3({ predictions, headlines, commodities, freight, flights, quakesNear }: Panel3Props) {
+export function Panel3({ predictions, headlines, commodities, freight, flights, navalFleets = [], quakesNear }: Panel3Props) {
   const { headlineRegion, setHeadlineRegion, p3, setP3, mapRef } = useUIStore();
 
   return (
@@ -20,11 +21,21 @@ export function Panel3({ predictions, headlines, commodities, freight, flights, 
       <div className="bp-head">
         <span>SIGNALS & MARKETS</span>
         <span className="bp-count">
-          {p3 === 'odds' ? predictions.length : p3 === 'headlines' ? headlines.length : p3 === 'markets' ? commodities.length + freight.length : p3 === 'flights' ? flights.length : quakesNear.length}
+          {p3 === 'odds'
+            ? predictions.length
+            : p3 === 'headlines'
+            ? headlines.length
+            : p3 === 'markets'
+            ? commodities.length + freight.length
+            : p3 === 'flights'
+            ? flights.length
+            : p3 === 'fleets'
+            ? navalFleets.length
+            : quakesNear.length}
         </span>
       </div>
       <div className="bp-tabs">
-        {(['odds', 'headlines', 'markets', 'flights', 'seismic'] as const).map((t) => (
+        {(['odds', 'headlines', 'markets', 'flights', 'fleets', 'seismic'] as const).map((t) => (
           <button key={t} className={p3 === t ? 'btab active' : 'btab'} onClick={() => setP3(t)}>
             {t.toUpperCase()}
           </button>
@@ -109,6 +120,29 @@ export function Panel3({ predictions, headlines, commodities, freight, flights, 
               </div>
             ))}
             {flights.length === 0 && <div className="empty">// no military flights active</div>}
+          </>
+        )}
+
+        {p3 === 'fleets' && (
+          <>
+            {navalFleets.map((fleet: NavalFleet) => (
+              <div
+                key={fleet.code}
+                className="row row-clickable"
+                onClick={() => mapRef?.flyTo({ center: [fleet.longitude, fleet.latitude], zoom: 5 })}
+              >
+                <span className={`sev-tag ${fleet.threat_level === 'critical' ? 'crit' : fleet.threat_level === 'elevated' ? 'high' : 'mid'}`}>
+                  {fleet.country_code}
+                </span>
+                <span className="row-main">
+                  <span className="row-title clamp2">{fleet.name}</span>
+                  <span className="row-sub clamp2">
+                    ⚓ {fleet.flagship} · {fleet.operational_area} · {fleet.status.toUpperCase()}
+                  </span>
+                </span>
+              </div>
+            ))}
+            {navalFleets.length === 0 && <div className="empty">// no strategic naval fleets tracked</div>}
           </>
         )}
 

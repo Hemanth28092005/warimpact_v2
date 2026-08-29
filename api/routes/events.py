@@ -82,7 +82,10 @@ async def get_prediction_markets(limit: int = Query(default=25, ge=1, le=100)) -
 
 
 @router.get("/flights")
-async def get_military_flights(limit: int = Query(default=500, ge=1, le=2000)) -> list[dict[str, Any]]:
+async def get_military_flights(
+    limit: int = Query(default=500, ge=1, le=2000),
+    hours: int = Query(default=2, ge=1, le=24, description="Query retention window in hours"),
+) -> list[dict[str, Any]]:
     async with open_async_connection() as conn:
         async with conn.cursor() as cur:
             await cur.execute(
@@ -90,11 +93,12 @@ async def get_military_flights(limit: int = Query(default=500, ge=1, le=2000)) -
                 SELECT hex_code, registration, aircraft_type, callsign, latitude, longitude,
                        altitude_ft, ground_speed_kt, squawk, observed_at
                 FROM military_flights
-                WHERE observed_at >= NOW() - interval '30 minutes'
+                WHERE observed_at >= NOW() - (%s || ' hours')::interval
+                   OR observed_at >= (SELECT MAX(observed_at) FROM military_flights) - interval '30 minutes'
                 ORDER BY observed_at DESC
                 LIMIT %s
                 """,
-                (limit,),
+                (hours, limit),
             )
             rows = await cur.fetchall()
     return [
@@ -126,6 +130,16 @@ async def get_intel_layers() -> dict[str, list[dict[str, Any]]]:
                 "SELECT category, name, from_name, from_lat, from_long, to_name, to_lat, to_long, is_estimated FROM intel_routes ORDER BY category, name"
             )
             route_rows = await cur.fetchall()
+            await cur.execute(
+                """
+                SELECT code, name, country_code, flag_country, fleet_type, flagship,
+                       composition, operational_area, latitude, longitude, status,
+                       threat_level, mission_brief, source_citation, last_reported_at
+                FROM naval_fleets
+                ORDER BY threat_level = 'critical' DESC, name ASC
+                """
+            )
+            fleet_rows = await cur.fetchall()
     return {
         "sites": [
             {
@@ -152,4 +166,79 @@ async def get_intel_layers() -> dict[str, list[dict[str, Any]]]:
             }
             for r in route_rows
         ],
+        "fleets": [
+            {
+                "code": r[0],
+                "name": r[1],
+                "country_code": r[2],
+                "flag_country": r[3],
+                "fleet_type": r[4],
+                "flagship": r[5],
+                "composition": r[6],
+                "operational_area": r[7],
+                "latitude": float(r[8]),
+                "longitude": float(r[9]),
+                "status": r[10],
+                "threat_level": r[11],
+                "mission_brief": r[12],
+                "source_citation": r[13],
+                "last_reported_at": r[14].isoformat() if hasattr(r[14], "isoformat") else str(r[14]),
+            }
+            for r in fleet_rows
+        ],
     }
+
+
+@router.get("/naval")
+async def get_naval_fleets(
+    country_code: str | None = Query(default=None, description="Filter by country code (e.g. USA, IND, CHN, GBR, FRA, RUS, NATO, IRN)"),
+    fleet_type: str | None = Query(default=None, description="Filter by fleet type"),
+    status: str | None = Query(default=None, description="Filter by deployment status"),
+    limit: int = Query(default=100, ge=1, le=200),
+) -> list[dict[str, Any]]:
+    query = """
+        SELECT code, name, country_code, flag_country, fleet_type, flagship,
+               composition, operational_area, latitude, longitude, status,
+               threat_level, mission_brief, source_citation, last_reported_at
+        FROM naval_fleets
+        WHERE 1=1
+    """
+    params: list[Any] = []
+    if country_code:
+        query += " AND country_code = %s"
+        params.append(country_code.upper().strip())
+    if fleet_type:
+        query += " AND fleet_type = %s"
+        params.append(fleet_type.lower().strip())
+    if status:
+        query += " AND status = %s"
+        params.append(status.lower().strip())
+
+    query += " ORDER BY threat_level = 'critical' DESC, threat_level = 'elevated' DESC, name ASC LIMIT %s"
+    params.append(limit)
+
+    async with open_async_connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(query, tuple(params))
+            rows = await cur.fetchall()
+
+    return [
+        {
+            "code": r[0],
+            "name": r[1],
+            "country_code": r[2],
+            "flag_country": r[3],
+            "fleet_type": r[4],
+            "flagship": r[5],
+            "composition": r[6],
+            "operational_area": r[7],
+            "latitude": float(r[8]),
+            "longitude": float(r[9]),
+            "status": r[10],
+            "threat_level": r[11],
+            "mission_brief": r[12],
+            "source_citation": r[13],
+            "last_reported_at": r[14].isoformat() if hasattr(r[14], "isoformat") else str(r[14]),
+        }
+        for r in rows
+    ]

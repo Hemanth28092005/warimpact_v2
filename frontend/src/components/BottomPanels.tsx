@@ -16,6 +16,7 @@ interface BottomPanelsProps {
   commodities: any[];
   freight: any[];
   flights: any[];
+  navalFleets?: any[];
   quakesNear: any[];
 }
 
@@ -40,6 +41,7 @@ export function BottomPanels(props: BottomPanelsProps) {
         commodities={props.commodities}
         freight={props.freight}
         flights={props.flights}
+        navalFleets={props.navalFleets}
         quakesNear={props.quakesNear}
       />
     </div>
