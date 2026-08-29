@@ -92,3 +92,22 @@ async def test_sage_chat_entity_deep_dive() -> None:
     data = resp.json()
     assert isinstance(data["reply"], str)
     assert len(data["suggested_followups"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_sage_tts_rejects_empty() -> None:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        resp = await ac.post("/api/v1/sage/tts", json={"text": "   "})
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_sage_tts_synthesizes_audio() -> None:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        resp = await ac.post(
+            "/api/v1/sage/tts",
+            json={"text": "Sage tactical intelligence online. Global DEFCON 1."},
+        )
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "audio/wav"
+    assert len(resp.content) > 1000

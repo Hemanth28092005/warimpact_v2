@@ -287,3 +287,25 @@ export interface SageSuggestion {
   emoji: string;
   prompts: string[];
 }
+
+export type VoiceConversationStatus =
+  | 'idle'
+  | 'listening'
+  | 'thinking'
+  | 'speaking'
+  | 'error';
+
+export interface VoiceTurn {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  timestamp: number;
+  model_used?: string;
+  latency_ms?: number;
+}
+
+export interface SageTTSRequest {
+  text: string;
+  voice?: string;
+  speed?: number;
+}

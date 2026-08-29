@@ -19,6 +19,8 @@ export function CommandBar({ defconLevel, clock: propClock }: CommandBarProps) {
     setShowTv,
     showSage,
     setShowSage,
+    sageVoiceMode,
+    setSageVoiceMode,
     selectedPort,
     setSelectedPort,
     mapRef,
@@ -41,15 +43,34 @@ export function CommandBar({ defconLevel, clock: propClock }: CommandBarProps) {
       <div className="cmd-left" title="S.A.G.E — Strategic Advisory & Geopolitical Evaluation">
         <span className="cmd-globe">◍</span>
         <span className="cmd-word">S·A·G·E</span>
+        <span className="cmd-sep">·</span>
+        <span className="cmd-word cmd-accent">MONITOR</span>
         <span className="cmd-ver">v1.0</span>
       </div>
       <div className="cmd-right">
         <button
-          className={`cmd-btn sage-btn ${showSage ? 'active' : ''}`}
-          onClick={() => setShowSage(!showSage)}
+          className={`cmd-btn sage-btn ${showSage && !sageVoiceMode ? 'active' : ''}`}
+          onClick={() => {
+            if (showSage && sageVoiceMode) {
+              setSageVoiceMode(false);
+            } else {
+              setShowSage(!showSage);
+              setSageVoiceMode(false);
+            }
+          }}
           title="S.A.G.E AI — Strategic Advisory & Geopolitical Evaluation"
         >
           <span className="sage-spark">🤖</span> S.A.G.E AI
+        </button>
+        <button
+          className={`cmd-btn sage-btn ${showSage && sageVoiceMode ? 'active' : ''}`}
+          onClick={() => {
+            setShowSage(true);
+            setSageVoiceMode(!sageVoiceMode || !showSage);
+          }}
+          title="S.A.G.E Voice-First Conversational Mode (Kokoro Neural TTS)"
+        >
+          <span className="sage-spark">🎙️</span> VOICE MODE
         </button>
         <button className={`cmd-btn brief-btn ${showBrief ? 'active' : ''}`} onClick={() => setShowBrief(true)}>
           <span className="brief-spark">✦</span> AI BRIEF

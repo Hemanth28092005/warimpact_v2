@@ -16,6 +16,7 @@ from api.routes.health import router as health_router
 from api.routes.live_feed import router as live_feed_router
 from api.routes.markets import router as markets_router
 from api.routes.sage import router as sage_router
+from api.routes.sage_tts import router as sage_tts_router
 
 app = FastAPI(
     title="S.A.G.E Platform API",
@@ -42,6 +43,7 @@ app.include_router(events_router)
 app.include_router(brief_router)
 app.include_router(alerts_router)
 app.include_router(sage_router)
+app.include_router(sage_tts_router)
 app.include_router(health_router)
 
 

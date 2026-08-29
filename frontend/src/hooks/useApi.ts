@@ -182,3 +182,20 @@ export function useSageSuggestions(enabled: boolean = true) {
     staleTime: Infinity,
   });
 }
+
+export async function synthesizeSageSpeech(
+  text: string,
+  voice?: string,
+  speed?: number
+): Promise<Blob> {
+  const res = await fetch('/api/v1/sage/tts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, voice, speed }),
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.detail || `Sage TTS failed (${res.status})`);
+  }
+  return res.blob();
+}

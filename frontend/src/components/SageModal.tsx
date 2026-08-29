@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useUIStore } from '../store';
 import { sendSageMessage, useSageContext, useSageSuggestions } from '../hooks/useApi';
+import { SageVoiceMode } from './SageVoiceMode';
 import type { SageChatMessage, SageTelemetryHighlight } from '../types';
 
 interface MessageItem extends SageChatMessage {
@@ -134,6 +135,8 @@ export function SageModal(): JSX.Element | null {
     sageMinimized,
     setSageMinimized,
     sageDraftPrompt,
+    sageVoiceMode,
+    setSageVoiceMode,
   } = useUIStore();
 
   const [messages, setMessages] = useState<MessageItem[]>([]);
@@ -183,29 +186,29 @@ export function SageModal(): JSX.Element | null {
 
     setError(null);
     setInput('');
+    setLoading(true);
 
-    const userMessage: MessageItem = {
+    const userMsg: MessageItem = {
       role: 'user',
       content: promptToSend,
       timestamp: Date.now(),
     };
 
-    const nextHistory = [...messages, userMessage];
-    setMessages(nextHistory);
-    setLoading(true);
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
 
     try {
-      const chatHistory = nextHistory.slice(0, -1).map((m) => ({
+      const historyPayload = newMessages.slice(-6).map((m) => ({
         role: m.role,
         content: m.content,
       }));
 
       const res = await sendSageMessage({
         message: promptToSend,
-        history: chatHistory,
+        history: historyPayload,
       });
 
-      const assistantMessage: MessageItem = {
+      const assistantMsg: MessageItem = {
         role: 'assistant',
         content: res.reply,
         timestamp: Date.now(),
@@ -215,7 +218,7 @@ export function SageModal(): JSX.Element | null {
         latencyMs: res.latency_ms,
       };
 
-      setMessages((prev) => [...prev, assistantMessage]);
+      setMessages((prev) => [...prev, assistantMsg]);
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : 'Sage advisory engine is temporarily unreachable.';
       setError(errMsg);
@@ -225,6 +228,28 @@ export function SageModal(): JSX.Element | null {
   };
 
   if (!showSage) return null;
+
+  if (sageVoiceMode) {
+    return (
+      <SageVoiceMode
+        initialHistory={messages.map((m) => ({ role: m.role, content: m.content }))}
+        onHistoryUpdate={(newHistory) => {
+          setMessages(
+            newHistory.map((h, i) => ({
+              role: h.role,
+              content: h.content,
+              timestamp: Date.now() - (newHistory.length - i) * 1000,
+            }))
+          );
+        }}
+        onSwitchToText={() => setSageVoiceMode(false)}
+        onClose={() => {
+          setShowSage(false);
+          setSageVoiceMode(false);
+        }}
+      />
+    );
+  }
 
   const filteredCategories =
     activeCategory === 'All'
@@ -256,6 +281,13 @@ export function SageModal(): JSX.Element | null {
             )}
           </div>
           <div className="sage-header-actions">
+            <button
+              className="sage-icon-btn sage-voice-toggle-btn"
+              title="Switch to Voice Mode"
+              onClick={() => setSageVoiceMode(true)}
+            >
+              🎙️ VOICE MODE
+            </button>
             <button
               className="sage-icon-btn"
               title="Clear Conversation"

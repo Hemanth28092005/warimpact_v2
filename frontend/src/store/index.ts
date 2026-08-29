@@ -36,6 +36,8 @@ interface UIState {
   showSage: boolean;
   sageMinimized: boolean;
   sageDraftPrompt: string | null;
+  sageVoiceMode: boolean;
+  sageTranscriptOpen: boolean;
 
   // Layers
   layers: LayerState;
@@ -67,6 +69,8 @@ interface UIState {
   setTvMinimized: (v: boolean) => void;
   setShowSage: (v: boolean) => void;
   setSageMinimized: (v: boolean) => void;
+  setSageVoiceMode: (v: boolean) => void;
+  setSageTranscriptOpen: (v: boolean) => void;
   openSageWithPrompt: (prompt: string) => void;
   toggleLayer: (k: keyof LayerState) => void;
   setLayers: (layers: LayerState) => void;
@@ -121,6 +125,8 @@ export const useUIStore = create<UIState>()(
       showSage: false,
       sageMinimized: false,
       sageDraftPrompt: null,
+      sageVoiceMode: false,
+      sageTranscriptOpen: false,
       layers: defaultLayers,
       loaded: defaultLoaded,
       alerts: [],
@@ -144,6 +150,8 @@ export const useUIStore = create<UIState>()(
       setTvMinimized: (v) => set({ tvMinimized: v }),
       setShowSage: (v) => set({ showSage: v }),
       setSageMinimized: (v) => set({ sageMinimized: v }),
+      setSageVoiceMode: (v) => set({ sageVoiceMode: v }),
+      setSageTranscriptOpen: (v) => set({ sageTranscriptOpen: v }),
       openSageWithPrompt: (prompt) => set({ showSage: true, sageDraftPrompt: prompt, sageMinimized: false }),
       toggleLayer: (k) =>
         set((s) => ({
