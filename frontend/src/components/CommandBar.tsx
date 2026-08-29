@@ -43,8 +43,6 @@ export function CommandBar({ defconLevel, clock: propClock }: CommandBarProps) {
       <div className="cmd-left" title="S.A.G.E — Strategic Advisory & Geopolitical Evaluation">
         <span className="cmd-globe">◍</span>
         <span className="cmd-word">S·A·G·E</span>
-        <span className="cmd-sep">·</span>
-        <span className="cmd-word cmd-accent">MONITOR</span>
         <span className="cmd-ver">v1.0</span>
       </div>
       <div className="cmd-right">
